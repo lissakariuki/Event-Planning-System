@@ -15,7 +15,7 @@ const events = [
     date: "December 24, 2023",
     time: "18:00 - 23:00",
     location: "Grand Park, New York City",
-    image: "/placeholder.svg?height=400&width=600",
+    image: "https://images.pexels.com/photos/1190297/pexels-photo-1190297.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
     price: "$50",
   },
   {
@@ -24,7 +24,7 @@ const events = [
     date: "December 16, 2023",
     time: "20:00 - 02:00",
     location: "Club Atmosphere, Miami",
-    image: "/placeholder.svg?height=400&width=600",
+    image: "https://images.pexels.com/photos/698907/pexels-photo-698907.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
     price: "$30",
   },
   {
@@ -33,7 +33,7 @@ const events = [
     date: "December 31, 2023",
     time: "19:00 - 00:00",
     location: "Stadium Arena, Los Angeles",
-    image: "/placeholder.svg?height=400&width=600",
+    image: "https://images.pexels.com/photos/2311713/pexels-photo-2311713.jpeg?auto=compress&cs=tinysrgb&w=600",
     price: "$45",
   },
 ]

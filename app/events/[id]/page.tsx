@@ -22,14 +22,14 @@ const event = {
   capacity: "20,000",
   organizer: {
     name: "World of Music",
-    image: "/placeholder.svg",
+    image: "https://images.pexels.com/photos/230887/pexels-photo-230887.jpeg?auto=compress&cs=tinysrgb&w=600",
     events: 24,
     followers: "967K",
   },
   gallery: [
-    "/placeholder.svg?height=400&width=600",
-    "/placeholder.svg?height=400&width=600",
-    "/placeholder.svg?height=400&width=600",
+    "https://images.pexels.com/photos/1190297/pexels-photo-1190297.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/698907/pexels-photo-698907.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/2311713/pexels-photo-2311713.jpeg?auto=compress&cs=tinysrgb&w=600",
   ],
 }
 
