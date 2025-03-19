@@ -20,31 +20,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-
-interface Guest {
-  id: number
-  name: string
-  email: string
-  rsvp: "Attending" | "Not Attending" | "Pending"
-  phone?: string
-  dietaryRestrictions?: string
-}
+import { useEventContext } from "@/contexts/event-contexts"
 
 export default function GuestsPage() {
-  const [guests, setGuests] = useState<Guest[]>([
-    { id: 1, name: "John Doe", email: "john@example.com", rsvp: "Attending", phone: "+1 234-567-8901" },
-    { id: 2, name: "Jane Smith", email: "jane@example.com", rsvp: "Not Attending", dietaryRestrictions: "Vegetarian" },
-    { id: 3, name: "Alice Johnson", email: "alice@example.com", rsvp: "Pending" },
-    {
-      id: 4,
-      name: "Bob Williams",
-      email: "bob@example.com",
-      rsvp: "Attending",
-      phone: "+1 987-654-3210",
-      dietaryRestrictions: "Gluten-free",
-    },
-    { id: 5, name: "Emma Brown", email: "emma@example.com", rsvp: "Pending" },
-  ])
+  const { guests, setGuests, addActivity } = useEventContext()
 
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddGuestOpen, setIsAddGuestOpen] = useState(false)
@@ -52,8 +31,8 @@ export default function GuestsPage() {
   const [isDeleteGuestOpen, setIsDeleteGuestOpen] = useState(false)
   const [isSendInvitationOpen, setIsSendInvitationOpen] = useState(false)
 
-  const [currentGuest, setCurrentGuest] = useState<Guest | null>(null)
-  const [newGuest, setNewGuest] = useState<Omit<Guest, "id">>({
+  const [currentGuest, setCurrentGuest] = useState<(typeof guests)[0] | null>(null)
+  const [newGuest, setNewGuest] = useState<Omit<(typeof guests)[0], "id">>({
     name: "",
     email: "",
     rsvp: "Pending",
@@ -70,7 +49,7 @@ export default function GuestsPage() {
       guest.email.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const validateGuestForm = (guest: Omit<Guest, "id">) => {
+  const validateGuestForm = (guest: Omit<(typeof guests)[0], "id">) => {
     const errors: { [key: string]: string } = {}
 
     if (!guest.name.trim()) {
@@ -95,10 +74,13 @@ export default function GuestsPage() {
     }
 
     const newId = Math.max(0, ...guests.map((g) => g.id)) + 1
-    setGuests([...guests, { ...newGuest, id: newId }])
+    const updatedGuests = [...guests, { ...newGuest, id: newId }]
+    setGuests(updatedGuests)
     setIsAddGuestOpen(false)
     setNewGuest({ name: "", email: "", rsvp: "Pending", phone: "", dietaryRestrictions: "" })
     setFormErrors({})
+
+    addActivity(`Guest added: ${newGuest.name}`)
 
     toast({
       title: "Guest Added",
@@ -121,6 +103,8 @@ export default function GuestsPage() {
     setCurrentGuest(null)
     setFormErrors({})
 
+    addActivity(`Guest updated: ${currentGuest.name}`)
+
     toast({
       title: "Guest Updated",
       description: `${currentGuest.name}'s information has been updated.`,
@@ -132,6 +116,8 @@ export default function GuestsPage() {
 
     setGuests(guests.filter((guest) => guest.id !== currentGuest.id))
     setIsDeleteGuestOpen(false)
+
+    addActivity(`Guest removed: ${currentGuest.name}`)
 
     toast({
       title: "Guest Removed",
@@ -145,6 +131,8 @@ export default function GuestsPage() {
   const handleSendInvitation = () => {
     // Here you would implement the logic to send invitations
     const selectedGuestNames = guests.filter((guest) => selectedGuests.includes(guest.id)).map((guest) => guest.name)
+
+    addActivity(`Invitations sent to ${selectedGuestNames.length} guests`)
 
     toast({
       title: "Invitations Sent",
@@ -164,19 +152,21 @@ export default function GuestsPage() {
 
     const guestName = guests.find((g) => g.id === id)?.name
 
+    addActivity(`RSVP updated: ${guestName} is ${newRSVP}`)
+
     toast({
       title: "RSVP Updated",
       description: `${guestName}'s RSVP status is now "${newRSVP}".`,
     })
   }
 
-  const openEditDialog = (guest: Guest) => {
+  const openEditDialog = (guest: (typeof guests)[0]) => {
     setCurrentGuest(guest)
     setFormErrors({})
     setIsEditGuestOpen(true)
   }
 
-  const openDeleteDialog = (guest: Guest) => {
+  const openDeleteDialog = (guest: (typeof guests)[0]) => {
     setCurrentGuest(guest)
     setIsDeleteGuestOpen(true)
   }

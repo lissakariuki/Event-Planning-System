@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Home, DollarSign, Users, Calendar, MessageCircle, CheckSquare, Music } from "lucide-react"
+import { Home, DollarSign, Users, Calendar, MessageCircle, CheckSquare, CalendarHeart } from "lucide-react"
 
 export function Sidebar() {
   return (
@@ -19,7 +19,7 @@ export function Sidebar() {
           href="/events"
           className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
         >
-          <Music className="mr-2" size={20} />
+          <CalendarHeart className="mr-2" size={20} />
           Events
         </Link>
         <Link

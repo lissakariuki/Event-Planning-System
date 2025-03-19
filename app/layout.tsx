@@ -5,6 +5,8 @@ import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
 import { Navbar } from "@/components/navbar"
 import { ChatAssistant } from "@/components/chat-assistant"
+import { Toaster } from "@/components/ui/toaster"
+import { EventProvider } from "@/contexts/event-contexts"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,18 +21,21 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={inter.className}>
-          <Navbar />
-          <div className="flex h-screen bg-gray-100 dark:bg-gray-950 pt-16">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto p-8">{children}</main>
-            <ChatAssistant />
-          </div>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ClerkProvider>
+          <EventProvider>
+            <Navbar />
+            <div className="flex h-screen bg-gray-100 dark:bg-gray-950 pt-16">
+              <Sidebar />
+              <main className="flex-1 overflow-y-auto p-8">{children}</main>
+              <ChatAssistant />
+            </div>
+            <Toaster />
+          </EventProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   )
 }
 
