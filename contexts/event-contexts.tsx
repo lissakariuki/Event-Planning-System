@@ -63,6 +63,22 @@ interface Vendor {
   }[]
 }
 
+// Add this new interface after the Vendor interface
+interface EventItem {
+  id: number
+  title: string
+  date: string
+  time: string
+  location: string
+  description?: string
+  image: string
+  price: string
+  category: string
+  organizer: string
+  attendees?: number
+}
+
+// Update the EventContextType interface to include events
 interface EventContextType {
   guests: Guest[]
   setGuests: React.Dispatch<React.SetStateAction<Guest[]>>
@@ -85,6 +101,8 @@ interface EventContextType {
   addActivity: (action: string) => void
   vendors: Vendor[]
   setVendors: React.Dispatch<React.SetStateAction<Vendor[]>>
+  events: EventItem[]
+  setEvents: React.Dispatch<React.SetStateAction<EventItem[]>>
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined)
@@ -156,7 +174,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         website: "www.elegantevents.com",
       },
       amenities: ["On-site catering", "AV equipment", "Parking", "Wheelchair accessible"],
-      images: ["https://images.pexels.com/photos/163864/santorini-oia-greece-travel-163864.jpeg?auto=compress&cs=tinysrgb&w=300"],
+      images: ["/placeholder.svg?height=400&width=600"],
     },
     {
       id: 2,
@@ -172,7 +190,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         phone: "+254 987 654 321",
         email: "info@gourmetdelights.com",
       },
-      images: ["https://images.pexels.com/photos/31177729/pexels-photo-31177729/free-photo-of-assorted-wraps-and-salads-on-bamboo-trays.jpeg?auto=compress&cs=tinysrgb&w=300"],
+      images: ["/placeholder.svg?height=400&width=600"],
     },
     {
       id: 3,
@@ -187,7 +205,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
       contactInfo: {
         email: "info@floralfantasy.com",
       },
-      images: ["https://images.pexels.com/photos/15579541/pexels-photo-15579541/free-photo-of-purple-pricne-tulips.jpeg?auto=compress&cs=tinysrgb&w=300"],
+      images: ["/placeholder.svg?height=400&width=600"],
     },
     {
       id: 4,
@@ -204,7 +222,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         email: "info@soundmasters.com",
         website: "www.soundmasters.com",
       },
-      images: ["https://images.pexels.com/photos/2049411/pexels-photo-2049411.jpeg?auto=compress&cs=tinysrgb&w=600"],
+      images: ["/placeholder.svg?height=400&width=600"],
     },
     {
       id: 5,
@@ -223,7 +241,52 @@ export function EventProvider({ children }: { children: ReactNode }) {
         website: "www.luxeballroom.com",
       },
       amenities: ["In-house catering", "Valet parking", "Bridal suite", "Stage", "Dance floor"],
-      images: ["https://images.pexels.com/photos/265947/pexels-photo-265947.jpeg?auto=compress&cs=tinysrgb&w=600"],
+      images: ["/placeholder.svg?height=400&width=600"],
+    },
+  ])
+
+  // Add the events state after the vendors state in the EventProvider function
+  const [events, setEvents] = useState<EventItem[]>([
+    {
+      id: 1,
+      title: "National Music Festival",
+      date: "December 24, 2023",
+      time: "18:00 - 23:00",
+      location: "Grand Park, New York City",
+      image:
+        "https://images.pexels.com/photos/1190297/pexels-photo-1190297.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      price: "$50",
+      category: "Music",
+      organizer: "World of Music",
+      description: "Join us for an unforgettable night of music featuring top artists from around the world.",
+      attendees: 120,
+    },
+    {
+      id: 2,
+      title: "DJ Music Competition",
+      date: "December 16, 2023",
+      time: "20:00 - 02:00",
+      location: "Club Atmosphere, Miami",
+      image:
+        "https://images.pexels.com/photos/698907/pexels-photo-698907.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+      price: "$30",
+      category: "Music",
+      organizer: "Miami Beats",
+      description: "Watch the best DJs compete for the grand prize in this exciting competition.",
+      attendees: 85,
+    },
+    {
+      id: 3,
+      title: "Rock & Roll Night",
+      date: "December 31, 2023",
+      time: "19:00 - 00:00",
+      location: "Stadium Arena, Los Angeles",
+      image: "https://images.pexels.com/photos/2311713/pexels-photo-2311713.jpeg?auto=compress&cs=tinysrgb&w=600",
+      price: "$45",
+      category: "Music",
+      organizer: "Rock Legends",
+      description: "Ring in the new year with classic rock hits and amazing performances.",
+      attendees: 200,
     },
   ])
 
@@ -257,6 +320,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
         const storedVendors = localStorage.getItem("eps_vendors")
         if (storedVendors) setVendors(JSON.parse(storedVendors))
+
+        // Add events to localStorage loading
+        const storedEvents = localStorage.getItem("eps_events")
+        if (storedEvents) setEvents(JSON.parse(storedEvents))
       } catch (error) {
         console.error("Error loading data from localStorage:", error)
       }
@@ -274,11 +341,13 @@ export function EventProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("eps_event", JSON.stringify(currentEvent))
       localStorage.setItem("eps_activities", JSON.stringify(recentActivities))
       localStorage.setItem("eps_vendors", JSON.stringify(vendors))
+      localStorage.setItem("eps_events", JSON.stringify(events))
     } catch (error) {
       console.error("Error saving data to localStorage:", error)
     }
-  }, [guests, tasks, budget, currentEvent, recentActivities, vendors])
+  }, [guests, tasks, budget, currentEvent, recentActivities, vendors, events])
 
+  // Update the EventContext.Provider value to include events and setEvents
   return (
     <EventContext.Provider
       value={{
@@ -295,6 +364,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
         addActivity,
         vendors,
         setVendors,
+        events,
+        setEvents,
       }}
     >
       {children}
@@ -309,4 +380,3 @@ export function useEventContext() {
   }
   return context
 }
-
