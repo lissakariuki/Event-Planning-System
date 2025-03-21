@@ -76,6 +76,7 @@ interface EventItem {
   category: string
   organizer: string
   attendees?: number
+  teamId?: string
 }
 
 // Update the EventContextType interface to include events
@@ -103,6 +104,7 @@ interface EventContextType {
   setVendors: React.Dispatch<React.SetStateAction<Vendor[]>>
   events: EventItem[]
   setEvents: React.Dispatch<React.SetStateAction<EventItem[]>>
+  getTeamEvents: (teamId: string) => EventItem[]
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined)
@@ -260,6 +262,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
       organizer: "World of Music",
       description: "Join us for an unforgettable night of music featuring top artists from around the world.",
       attendees: 120,
+      teamId: "1",
     },
     {
       id: 2,
@@ -274,6 +277,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
       organizer: "Miami Beats",
       description: "Watch the best DJs compete for the grand prize in this exciting competition.",
       attendees: 85,
+      teamId: "1",
     },
     {
       id: 3,
@@ -287,12 +291,18 @@ export function EventProvider({ children }: { children: ReactNode }) {
       organizer: "Rock Legends",
       description: "Ring in the new year with classic rock hits and amazing performances.",
       attendees: 200,
+      teamId: "2",
     },
   ])
 
   // Helper function to add a new activity
   const addActivity = (action: string) => {
     setRecentActivities([{ action, timestamp: "Just now" }, ...recentActivities.slice(0, 2)])
+  }
+
+  // Helper function to get events by team ID
+  const getTeamEvents = (teamId: string): EventItem[] => {
+    return events.filter((event) => event.teamId === teamId)
   }
 
   // Load data from localStorage on initial render
@@ -366,6 +376,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         setVendors,
         events,
         setEvents,
+        getTeamEvents,
       }}
     >
       {children}
@@ -380,3 +391,4 @@ export function useEventContext() {
   }
   return context
 }
+

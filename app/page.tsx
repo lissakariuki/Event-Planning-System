@@ -4,11 +4,25 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BarChart, Calendar, DollarSign, Users, Check } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { TeamContextDisplay } from "@/components/team-context-display"
+import { TeamDiscussion } from "@/components/team-discussion"
+import { useTeam } from "@/contexts/team-context"
 import { useEventContext } from "@/contexts/event-contexts"
+import { useState, useEffect } from "react"
 
 export default function Dashboard() {
   // Use the shared context instead of local state
-  const { guests, tasks, setTasks, budget, currentEvent, recentActivities, addActivity } = useEventContext()
+  const { guests, tasks, setTasks, budget, currentEvent, recentActivities, addActivity, getTeamEvents } =
+    useEventContext()
+  const { currentTeam } = useTeam()
+  const [teamEvents, setTeamEvents] = useState<number>(0)
+
+  useEffect(() => {
+    if (currentTeam) {
+      const events = getTeamEvents(currentTeam.id)
+      setTeamEvents(events.length)
+    }
+  }, [currentTeam, getTeamEvents])
 
   // Calculate derived data
   const confirmedGuests = guests.filter((guest) => guest.rsvp === "Attending").length
@@ -46,6 +60,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Dashboard</h1>
+      <TeamContextDisplay />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Link href="/budget" passHref>
           <Card className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
@@ -95,16 +110,16 @@ export default function Dashboard() {
           </Card>
         </Link>
 
-        <Link href="/events/1" passHref>
+        <Link href="/events" passHref>
           <Card className="p-6 cursor-pointer hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Event Date</h2>
+              <h2 className="text-lg font-semibold">Events</h2>
               <Calendar className="text-purple-500" size={24} />
             </div>
-            <p className="mt-2 text-3xl font-bold">{daysRemaining}</p>
-            <p className="text-sm text-gray-500">Days Remaining</p>
+            <p className="mt-2 text-3xl font-bold">{teamEvents}</p>
+            <p className="text-sm text-gray-500">Team Events</p>
             <p className="text-xs text-gray-400 mt-1">
-              {eventDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              Next: {eventDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
             </p>
           </Card>
         </Link>
@@ -155,6 +170,8 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      <TeamDiscussion />
     </div>
   )
 }
