@@ -29,7 +29,7 @@ export interface User {
     expiresAt: Date
   }
   
-   export type Event = {
+  export interface Event {
     id: string
     title: string
     date: string
@@ -40,8 +40,8 @@ export interface User {
     price: string
     category: string
     organizer: string
-    teamId: string | undefined
-    capacity?: string
+    teamId: string
+    attendees: number
   }
   
   export interface Task {

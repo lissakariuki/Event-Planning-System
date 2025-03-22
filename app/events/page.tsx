@@ -16,6 +16,8 @@ import type { Event } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { ImageUrlInput } from "@/components/image-url-input"
+
 // Add a local formatEventDate function
 const formatEventDate = (dateString: string) => {
   try {
@@ -32,18 +34,22 @@ export default function EventsPage() {
   const { events, setEvents, addActivity } = useEventContext()
   const [searchTerm, setSearchTerm] = useState("")
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false)
-  const [newEvent, setNewEvent] = useState({
+  const [isEditEventOpen, setIsEditEventOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [eventToEdit, setEventToEdit] = useState<Event | null>(null)
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null)
+  const [newEvent, setNewEvent] = useState<Omit<Event, "id">>({
     title: "",
     date: "",
     time: "",
     location: "",
     description: "",
-    image:
-      "https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    image: "",
     price: "",
     category: "Music",
     organizer: "",
     teamId: "",
+    attendees: 0,
   })
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -73,10 +79,11 @@ export default function EventsPage() {
 
   const handleCreateEvent = () => {
     if (newEvent.title && newEvent.date) {
-      const newId = Math.max(0, ...events.map((e) => Number(e.id))) + 1
+      // Find the maximum ID and convert to number, then add 1
+      const newId = (Math.max(0, ...events.map((e) => Number.parseInt(e.id.toString()))) + 1).toString()
 
-      const eventToAdd = {
-        id: newId.toString(),
+      const eventToAdd: Event = {
+        id: newId,
         title: newEvent.title,
         date: newEvent.date,
         time: newEvent.time || "12:00 - 14:00",
@@ -85,11 +92,12 @@ export default function EventsPage() {
         price: newEvent.price || "$0",
         category: newEvent.category || "Music",
         organizer: newEvent.organizer || "Event Planning System",
-        teamId: currentTeam?.id,
-        image: "/placeholder.svg?height=400&width=600",
+        teamId: currentTeam?.id || "",
+        image: newEvent.image || "/placeholder.svg?height=400&width=600",
+        attendees: 0,
       }
 
-      setEvents([...events, eventToAdd])
+      setEvents([...events, eventToAdd as EventItem])
       addActivity(`New event created: ${newEvent.title}`)
 
       setIsCreateEventOpen(false)
@@ -99,22 +107,47 @@ export default function EventsPage() {
         time: "",
         location: "",
         description: "",
-        image:
-          "https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+        image: "",
         price: "",
         category: "Music",
         organizer: "",
         teamId: "",
+        attendees: 0,
       })
     }
   }
 
   const handleEditEvent = (event: Event) => {
-    console.log("Edit event:", event)
+    setEventToEdit(event)
+    setIsEditEventOpen(true)
+  }
+
+  const handleUpdateEvent = () => {
+    if (eventToEdit) {
+      const updatedEvents = events.map((event) => 
+        Number(event.id) === Number(eventToEdit.id) ? { ...eventToEdit, id: Number(eventToEdit.id) } : event
+      )
+
+      setEvents(updatedEvents)
+      addActivity(`Event updated: ${eventToEdit.title}`)
+      setIsEditEventOpen(false)
+      setEventToEdit(null)
+    }
+  }
+
+  const handleDeleteEvent = () => {
+    if (eventToDelete) {
+      const updatedEvents = events.filter((event) => event.id.toString() !== eventToDelete.id.toString())
+      setEvents(updatedEvents)
+      addActivity(`Event deleted: ${eventToDelete.title}`)
+      setIsDeleteDialogOpen(false)
+      setEventToDelete(null)
+    }
   }
 
   const handleOpenDeleteDialog = (event: Event) => {
-    console.log("Open delete dialog:", event)
+    setEventToDelete(event)
+    setIsDeleteDialogOpen(true)
   }
 
   return (
@@ -154,14 +187,14 @@ export default function EventsPage() {
                 <Plus className="mr-2 h-4 w-4" /> Create Event
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Create New Event</DialogTitle>
               </DialogHeader>
-              <Tabs defaultValue="details" className="w-[400px]">
-                <TabsList>
+              <Tabs defaultValue="details" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                  <TabsTrigger value="media">Media & Settings</TabsTrigger>
                 </TabsList>
                 <TabsContent value="details" className="space-y-4 mt-4">
                   <div className="grid gap-2">
@@ -173,23 +206,25 @@ export default function EventsPage() {
                       placeholder="Enter event title"
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="event-date">Date</Label>
-                    <Input
-                      id="event-date"
-                      type="date"
-                      value={newEvent.date}
-                      onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="event-time">Time</Label>
-                    <Input
-                      id="event-time"
-                      type="time"
-                      value={newEvent.time}
-                      onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="event-date">Date</Label>
+                      <Input
+                        id="event-date"
+                        type="date"
+                        value={newEvent.date}
+                        onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="event-time">Time</Label>
+                      <Input
+                        id="event-time"
+                        placeholder="e.g. 18:00 - 22:00"
+                        value={newEvent.time}
+                        onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                      />
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="event-location">Location</Label>
@@ -200,57 +235,82 @@ export default function EventsPage() {
                       placeholder="Enter event location"
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="event-price">Price</Label>
-                    <Input
-                      id="event-price"
-                      value={newEvent.price}
-                      onChange={(e) => setNewEvent({ ...newEvent, price: e.target.value })}
-                      placeholder="Enter event price"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="event-capacity">Capacity</Label>
-                    <Input
-                      id="event-capacity"
-                      value={newEvent.capacity}
-                      onChange={(e) => setNewEvent({ ...newEvent, capacity: e.target.value })}
-                      placeholder="Enter event capacity"
-                    />
-                  </div>
-                  // Add team selection to the event form in the "details" tab
-                  <TabsContent value="details" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="event-organizer">Organizer</Label>
+                      <Label htmlFor="event-price">Price</Label>
                       <Input
-                        id="event-organizer"
-                        value={newEvent.organizer}
-                        onChange={(e) => setNewEvent({ ...newEvent, organizer: e.target.value })}
+                        id="event-price"
+                        value={newEvent.price}
+                        onChange={(e) => setNewEvent({ ...newEvent, price: e.target.value })}
+                        placeholder="e.g. $50"
                       />
                     </div>
-
                     <div className="grid gap-2">
-                      <Label htmlFor="event-description">Description</Label>
-                      <Textarea
-                        id="event-description"
-                        rows={5}
-                        value={newEvent.description}
-                        onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                      />
+                      <Label htmlFor="event-category">Category</Label>
+                      <Select
+                        value={newEvent.category}
+                        onValueChange={(value) => setNewEvent({ ...newEvent, category: value })}
+                      >
+                        <SelectTrigger id="event-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories
+                            .filter((c) => c !== "all")
+                            .map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-
-                    {currentTeam && (
-                      <div className="grid gap-2">
-                        <Label>Team</Label>
-                        <div className="p-2 border rounded-md bg-gray-50">{currentTeam.name}</div>
-                        <p className="text-xs text-gray-500">This event will be associated with your current team.</p>
-                      </div>
-                    )}
-                  </TabsContent>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="event-organizer">Organizer</Label>
+                    <Input
+                      id="event-organizer"
+                      value={newEvent.organizer}
+                      onChange={(e) => setNewEvent({ ...newEvent, organizer: e.target.value })}
+                      placeholder="Enter organizer name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="event-description">Description</Label>
+                    <Textarea
+                      id="event-description"
+                      rows={5}
+                      value={newEvent.description}
+                      onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                      placeholder="Enter event description"
+                    />
+                  </div>
+                  {currentTeam && (
+                    <div className="grid gap-2">
+                      <Label>Team</Label>
+                      <div className="p-2 border rounded-md bg-gray-50">{currentTeam.name}</div>
+                      <p className="text-xs text-gray-500">This event will be associated with your current team.</p>
+                    </div>
+                  )}
                 </TabsContent>
-                <TabsContent value="settings">Settings content</TabsContent>
+                <TabsContent value="media" className="space-y-4 mt-4">
+                  <ImageUrlInput
+                    label="Event Image URL"
+                    id="event-image"
+                    value={newEvent.image}
+                    onChange={(value) => setNewEvent({ ...newEvent, image: value })}
+                    previewHeight={200}
+                    previewWidth={400}
+                    previewClassName="rounded-md"
+                  />
+                </TabsContent>
               </Tabs>
-              <Button onClick={handleCreateEvent}>Create Event</Button>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setIsCreateEventOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateEvent}>Create Event</Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
@@ -258,17 +318,173 @@ export default function EventsPage() {
 
       <TeamContextDisplay />
 
+      {/* Edit Event Dialog */}
+      <Dialog open={isEditEventOpen} onOpenChange={setIsEditEventOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+          </DialogHeader>
+          {eventToEdit && (
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="media">Media & Settings</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="space-y-4 mt-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-event-title">Title</Label>
+                  <Input
+                    id="edit-event-title"
+                    value={eventToEdit.title}
+                    onChange={(e) => setEventToEdit({ ...eventToEdit, title: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-event-date">Date</Label>
+                    <Input
+                      id="edit-event-date"
+                      type="date"
+                      value={eventToEdit.date}
+                      onChange={(e) => setEventToEdit({ ...eventToEdit, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-event-time">Time</Label>
+                    <Input
+                      id="edit-event-time"
+                      value={eventToEdit.time}
+                      onChange={(e) => setEventToEdit({ ...eventToEdit, time: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-event-location">Location</Label>
+                  <Input
+                    id="edit-event-location"
+                    value={eventToEdit.location}
+                    onChange={(e) => setEventToEdit({ ...eventToEdit, location: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-event-price">Price</Label>
+                    <Input
+                      id="edit-event-price"
+                      value={eventToEdit.price}
+                      onChange={(e) => setEventToEdit({ ...eventToEdit, price: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-event-category">Category</Label>
+                    <Select
+                      value={eventToEdit.category}
+                      onValueChange={(value) => setEventToEdit({ ...eventToEdit, category: value })}
+                    >
+                      <SelectTrigger id="edit-event-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories
+                          .filter((c) => c !== "all")
+                          .map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-event-organizer">Organizer</Label>
+                  <Input
+                    id="edit-event-organizer"
+                    value={eventToEdit.organizer}
+                    onChange={(e) => setEventToEdit({ ...eventToEdit, organizer: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-event-description">Description</Label>
+                  <Textarea
+                    id="edit-event-description"
+                    rows={5}
+                    value={eventToEdit.description}
+                    onChange={(e) => setEventToEdit({ ...eventToEdit, description: e.target.value })}
+                  />
+                </div>
+              </TabsContent>
+              <TabsContent value="media" className="space-y-4 mt-4">
+                <ImageUrlInput
+                  label="Event Image URL"
+                  id="edit-event-image"
+                  value={eventToEdit.image}
+                  onChange={(value) => setEventToEdit({ ...eventToEdit, image: value })}
+                  previewHeight={200}
+                  previewWidth={400}
+                  previewClassName="rounded-md"
+                />
+              </TabsContent>
+            </Tabs>
+          )}
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setIsEditEventOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateEvent}>Update Event</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Event</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>Are you sure you want to delete this event?</p>
+            <p className="font-semibold mt-2">{eventToDelete?.title}</p>
+            <p className="text-sm text-gray-500 mt-1">This action cannot be undone.</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteEvent}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {filteredEvents.length === 0 ? (
-        <div>No events found.</div>
+        <div className="text-center py-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+            <Calendar className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium">No events found</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            {searchTerm ? "Try adjusting your search or filters" : "Create your first event to get started"}
+          </p>
+          <Button className="mt-4" onClick={() => setIsCreateEventOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Create Event
+          </Button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((event) => (
             <Card className="overflow-hidden hover:shadow-lg transition-shadow" key={event.id}>
               <div className="relative aspect-video">
-                <Image src={"/placeholder.svg?height=400&width=600"} alt={event.title} fill className="object-cover" />
+                <Image
+                  src={event.image || "/placeholder.svg?height=400&width=600"}
+                  alt={event.title}
+                  fill
+                  className="object-cover"
+                />
               </div>
               <div className="p-4">
-                <div className="p-4 flex-1">
+                <div className="flex-1">
                   <div className="flex justify-between">
                     <Link href={`/events/${event.id}`}>
                       <h3 className="text-xl font-semibold mb-2 hover:text-blue-600 transition-colors">
