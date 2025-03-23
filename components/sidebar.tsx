@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
+import { usePathname, useParams } from "next/navigation"
 import {
   Home,
   DollarSign,
@@ -9,154 +11,196 @@ import {
   MessageCircle,
   CheckSquare,
   Music,
-  UserPlus,
   PlusCircle,
+  Settings,
+  Store,
+  FileText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
-import { useTeam } from "@/contexts/team-context"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { useTeam } from "@/contexts/team-context"
+import { TeamCreationForm } from "@/components/team-creation-form"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export function Sidebar() {
-  const { teams, currentTeam, setCurrentTeam, createTeam } = useTeam()
-  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false)
-  const [newTeam, setNewTeam] = useState({ name: "", description: "" })
+  const pathname = usePathname()
+  const params = useParams()
+  const currentTeamId = params.id as string
 
-  const handleCreateTeam = () => {
-    if (newTeam.name.trim()) {
-      createTeam(newTeam.name, newTeam.description)
-      setNewTeam({ name: "", description: "" })
-      setIsCreateTeamOpen(false)
-    }
-  }
+  const { teams } = useTeam()
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false)
+  const [isTeamsOpen, setIsTeamsOpen] = useState(true)
 
   return (
-    <div className="w-64 bg-white dark:bg-gray-900 h-full shadow-md flex flex-col">
-      <div className="p-4">
-        <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">EPS</h1>
+    <div className="w-64 bg-sidebar-bg text-sidebar-fg h-full shadow-md flex flex-col border-r border-border">
+      <div className="p-4 flex items-center">
+        <Link href="/" className="text-2xl font-bold text-primary">
+          EPS
+        </Link>
+        <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Beta</span>
       </div>
 
-      {/* Teams Section */}
-      <div className="px-4 mt-4">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400">TEAMS</h2>
-          <Dialog open={isCreateTeamOpen} onOpenChange={setIsCreateTeamOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-5 w-5">
-                <PlusCircle className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Team</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="team-name">Team Name</Label>
-                  <Input
-                    id="team-name"
-                    value={newTeam.name}
-                    onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
-                    placeholder="Enter team name"
+      <div className="px-3 py-2">
+        <Collapsible open={isTeamsOpen} onOpenChange={setIsTeamsOpen} className="space-y-1">
+          <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-1.5 text-sm font-semibold rounded-md hover:bg-sidebar-hover">
+            <span>TEAMS</span>
+            {isTeamsOpen ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1">
+            {teams.map((team) => (
+              <Link
+                key={team.id}
+                href={`/teams/${team.id}`}
+                className={cn(
+                  "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+                  pathname.startsWith("/teams/") && currentTeamId === team.id
+                    ? "bg-sidebar-active text-sidebar-active-fg font-medium"
+                    : "text-sidebar-fg",
+                )}
+              >
+                <Avatar className="h-5 w-5 mr-2">
+                  <AvatarImage
+                    src={team.budget?.logo || `/placeholder.svg?text=${team.name.charAt(0)}`}
+                    alt={team.name}
                   />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="team-description">Description (Optional)</Label>
-                  <Input
-                    id="team-description"
-                    value={newTeam.description}
-                    onChange={(e) => setNewTeam({ ...newTeam, description: e.target.value })}
-                    placeholder="Enter team description"
-                  />
-                </div>
-              </div>
-              <Button onClick={handleCreateTeam}>Create Team</Button>
-            </DialogContent>
-          </Dialog>
-        </div>
-        <div className="space-y-1 mb-4">
-          {teams.map((team) => (
-            <button
-              key={team.id}
-              onClick={() => setCurrentTeam(team)}
-              className={`w-full text-left px-2 py-1 rounded-md text-sm ${
-                currentTeam?.id === team.id
-                  ? "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
-              }`}
+                  <AvatarFallback>{team.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span className="truncate">{team.name}</span>
+              </Link>
+            ))}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-sm font-normal px-2 py-1.5 h-auto hover:bg-sidebar-hover"
+              onClick={() => setIsCreateTeamOpen(true)}
             >
-              {team.name}
-            </button>
-          ))}
-        </div>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              New Team
+            </Button>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
-      <nav className="flex-1 overflow-y-auto">
+      <nav className="mt-4 flex-1 px-3 space-y-1">
         <Link
           href="/"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <Home className="mr-2" size={20} />
+          <Home className="mr-2" size={18} />
           Dashboard
         </Link>
         <Link
           href="/events"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/events" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <Music className="mr-2" size={20} />
+          <Music className="mr-2" size={18} />
           Events
         </Link>
         <Link
           href="/budget"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/budget" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <DollarSign className="mr-2" size={20} />
+          <DollarSign className="mr-2" size={18} />
           Budget
         </Link>
         <Link
           href="/vendors"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/vendors" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <Users className="mr-2" size={20} />
+          <Store className="mr-2" size={18} />
           Vendors
         </Link>
         <Link
           href="/guests"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/guests" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <Users className="mr-2" size={20} />
+          <Users className="mr-2" size={18} />
           Guests
         </Link>
         <Link
           href="/calendar"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/calendar" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <Calendar className="mr-2" size={20} />
+          <Calendar className="mr-2" size={18} />
           Calendar
         </Link>
         <Link
           href="/tasks"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/tasks" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <CheckSquare className="mr-2" size={20} />
+          <CheckSquare className="mr-2" size={18} />
           Tasks
         </Link>
         <Link
-          href="/team-members"
-          className="flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          href="/teams"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/teams" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
         >
-          <UserPlus className="mr-2" size={20} />
+          <Users className="mr-2" size={18} />
           Team Members
         </Link>
+        <Link
+          href="/documents"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/documents" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
+        >
+          <FileText className="mr-2" size={18} />
+          Documents
+        </Link>
+        <Link
+          href="/settings"
+          className={cn(
+            "flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-hover",
+            pathname === "/settings" ? "bg-sidebar-active text-sidebar-active-fg font-medium" : "text-sidebar-fg",
+          )}
+        >
+          <Settings className="mr-2" size={18} />
+          Settings
+        </Link>
       </nav>
-      <div className="p-4">
-        <button className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-md flex items-center justify-center">
-          <MessageCircle className="mr-2" size={20} />
+
+      <div className="p-3 mt-auto">
+        <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+          <MessageCircle className="mr-2" size={18} />
           Chat Assistant
-        </button>
+        </Button>
       </div>
+
+      {/* Team Creation Form */}
+      <TeamCreationForm isOpen={isCreateTeamOpen} onClose={() => setIsCreateTeamOpen(false)} />
     </div>
   )
 }
