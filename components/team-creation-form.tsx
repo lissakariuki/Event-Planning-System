@@ -43,10 +43,11 @@ export function TeamCreationForm({ isOpen, onClose }: TeamCreationFormProps) {
         current: currentBudget,
         total: totalBudget,
         logo: formData.logo || `/placeholder.svg?height=100&width=100&text=${formData.name.trim().charAt(0)}`,
-        coverImage: formData.coverImage || "/placeholder.svg?height=300&width=1200",
+        coverImage: formData.coverImage || "https://images.pexels.com/photos/31049332/pexels-photo-31049332/free-photo-of-minimalist-palm-tree-with-afternoon-shadows.jpeg?auto=compress&cs=tinysrgb&w=600&lazy=load",
       })
 
       // Reset form and close dialog
+      // Reset form data
       setFormData({
         name: "",
         description: "",
@@ -57,6 +58,28 @@ export function TeamCreationForm({ isOpen, onClose }: TeamCreationFormProps) {
           total: 0,
         },
       })
+
+      // Update database in real-time
+      try {
+         fetch(`/api/teams/${createdTeam.id}`, {
+          method: 'PUT',
+          headers: {
+        'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        logo: formData.logo,
+        coverImage: formData.coverImage,
+        budget: {
+          current: currentBudget,
+          total: totalBudget,
+        },
+          }),
+        });
+      } catch (error) {
+        console.error('Error updating team:', error);
+      }
       onClose()
 
       // Navigate to the new team page

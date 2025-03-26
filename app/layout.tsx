@@ -1,12 +1,11 @@
 import type React from "react"
 import { Inter } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
-import { TeamProvider } from "@/contexts/team-context"
-import { EventProvider } from "@/contexts/event-contexts"
-import { Navbar } from "@/components/navbar"
-import { Sidebar } from "@/components/sidebar"
-import { ChatAssistant } from "@/components/chat-assistant"
 import "./globals.css"
+import { Sidebar } from "@/components/sidebar"
+import { Navbar } from "@/components/navbar"
+import { ChatAssistant } from "@/components/chat-assistant"
+import { TeamProvider } from "@/contexts/team-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,24 +20,21 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ClerkProvider>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={inter.className}>
           <TeamProvider>
-            <EventProvider>
-              <div className="flex h-screen overflow-hidden">
-                <Sidebar />
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <Navbar />
-                  <main className="flex-1 overflow-auto pt-16 p-6">{children}</main>
-                  <ChatAssistant />
-                </div>
+            <div className="flex h-screen">
+              <Sidebar />
+              <div className="flex-1 flex flex-col">
+                <Navbar />
+                <main className="flex-1 overflow-auto p-6">{children}</main>
               </div>
-            </EventProvider>
+            </div>
+            <ChatAssistant />
           </TeamProvider>
-        </ClerkProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }
-

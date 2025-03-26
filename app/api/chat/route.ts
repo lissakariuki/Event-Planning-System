@@ -15,7 +15,7 @@ export async function POST(req: Request) {
         {
           role: "system",
           content:
-            "You are an AI assistant for an event planning system. Help users with venue selection, budget tracking, scheduling reminders, and vendor recommendations. Format your responses with clear structure: use numbered lists for steps, bullet points for options, and highlight important information. Keep paragraphs short and focused.",
+            "You are an AI assistant for an event planning system. Help users with venue selection, budget tracking, scheduling reminders, and vendor recommendations.",
         },
         ...messages,
       ],

@@ -1,114 +1,190 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Pencil, Trash2, Plus, AlertCircle } from "lucide-react"
+import { Pencil, Trash2, Plus, Loader2, CheckSquare } from "lucide-react"
 import { useTeam } from "@/contexts/team-context"
-import { useEventContext } from "@/contexts/event-contexts"
-import { TeamContextDisplay } from "@/components/team-context-display"
+import { useSupabase, useRealtimeSubscription } from "@/hooks/use-supabase"
+import { useUser } from "@clerk/nextjs"
+import { AlertDisplay } from "@/components/ui/alert-display"
 
 interface Task {
-  id: number
+  id: string
   title: string
   completed: boolean
-  assignedTo?: string
+  created_by: string
 }
 
 export default function TasksPage() {
-  const { currentTeam } = useTeam()
-  const { tasks, setTasks, addActivity } = useEventContext()
+  const { currentTeam, isLoading: isTeamLoading } = useTeam()
+  const { user } = useUser()
+  const { supabase } = useSupabase()
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [newTask, setNewTask] = useState("")
-  const [assignee, setAssignee] = useState<string | undefined>(undefined)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
-  const handleAddTask = () => {
-    if (newTask.trim()) {
-      const newId = Math.max(0, ...tasks.map((t) => t.id)) + 1
-      const updatedTasks = [
-        ...tasks,
-        {
-          id: newId,
-          title: newTask,
-          completed: false,
-          teamId: currentTeam?.id,
-          assignedTo: assignee,
-        },
-      ]
-      setTasks(updatedTasks)
-      setNewTask("")
-      setAssignee(undefined)
-      setIsAddTaskOpen(false)
+  // Fetch tasks data
+  const fetchTasks = async () => {
+    if (!currentTeam) return []
 
-      // Add to recent activities
-      addActivity(`Task added: ${newTask}`)
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("team_id", currentTeam.id)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading tasks:", error)
+        setError("Failed to load tasks")
+        return []
+      }
+
+      if (data) {
+        setTasks(data)
+      }
+
+      return data || []
+    } catch (err) {
+      console.error("Error in fetchTasks:", err)
+      setError("An unexpected error occurred")
+      return []
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Set up real-time subscription
+  useRealtimeSubscription(
+    "tasks",
+    currentTeam?.id,
+    () => {
+      fetchTasks()
+    },
+    fetchTasks,
+  )
+
+  // Initial data load
+  useEffect(() => {
+    if (currentTeam) {
+      fetchTasks()
+    }
+  }, [currentTeam])
+
+  const handleAddTask = async () => {
+    if (!newTask.trim() || !currentTeam || !user) return
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert({
+          team_id: currentTeam.id,
+          title: newTask.trim(),
+          completed: false,
+          created_by: user.id,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setNewTask("")
+      setIsAddTaskOpen(false)
+    } catch (err: any) {
+      console.error("Error adding task:", err)
+      setError(`Failed to add task: ${err.message}`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task)
-    setIsAddTaskOpen(true)
     setNewTask(task.title)
-    setAssignee(task.assignedTo)
+    setIsAddTaskOpen(true)
   }
 
-  const handleUpdateTask = () => {
-    if (editingTask && newTask.trim()) {
-      const updatedTasks = tasks.map((task) =>
-        task.id === editingTask.id ? { ...task, title: newTask, assignedTo: assignee } : task,
-      )
-      setTasks(updatedTasks)
+  const handleUpdateTask = async () => {
+    if (!editingTask || !newTask.trim() || !currentTeam) return
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ title: newTask.trim() })
+        .eq("id", editingTask.id)
+        .eq("team_id", currentTeam.id)
+
+      if (error) throw error
+
       setNewTask("")
-      setAssignee(undefined)
       setIsAddTaskOpen(false)
       setEditingTask(null)
-
-      // Add to recent activities
-      addActivity(`Task updated: ${newTask}`)
+    } catch (err: any) {
+      console.error("Error updating task:", err)
+      setError(`Failed to update task: ${err.message}`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const handleDeleteTask = (id: number) => {
-    setTasks(tasks.filter((task) => task.id !== id))
+  const handleDeleteTask = async (id: string) => {
+    if (!currentTeam) return
 
-    // Add to recent activities
-    const taskToDelete = tasks.find((task) => task.id === id)
-    if (taskToDelete) {
-      addActivity(`Task deleted: ${taskToDelete.title}`)
+    setError(null)
+
+    try {
+      const { error } = await supabase.from("tasks").delete().eq("id", id).eq("team_id", currentTeam.id)
+
+      if (error) throw error
+    } catch (err: any) {
+      console.error("Error deleting task:", err)
+      setError(`Failed to delete task: ${err.message}`)
     }
   }
 
-  const handleToggleTask = (id: number) => {
-    setTasks(tasks.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task)))
+  const handleToggleTask = async (id: string, completed: boolean) => {
+    if (!currentTeam) return
 
-    // Add to recent activities
-    const taskToToggle = tasks.find((task) => task.id === id)
-    if (taskToToggle) {
-      addActivity(`Task ${taskToToggle.completed ? "reopened" : "completed"}: ${taskToToggle.title}`)
+    setError(null)
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ completed: !completed })
+        .eq("id", id)
+        .eq("team_id", currentTeam.id)
+
+      if (error) throw error
+    } catch (err: any) {
+      console.error("Error toggling task:", err)
+      setError(`Failed to update task status: ${err.message}`)
     }
   }
 
-  const getAssigneeName = (userId?: string) => {
-    if (!userId || !currentTeam) return "Unassigned"
-    const member = currentTeam.members.find((m) => m.userId === userId)
-    return member ? member.user.name : "Unassigned"
-  }
-
-  // Filter tasks to only show those for the current team
-  const teamTasks = tasks.filter((task) => !task.teamId || task.teamId === currentTeam?.id)
-
-  if (!currentTeam) {
+  // Show loading state when team is loading
+  if (isTeamLoading || !currentTeam) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <AlertCircle className="h-12 w-12 text-yellow-500 mb-4" />
-        <h2 className="text-2xl font-bold mb-2">No Team Selected</h2>
-        <p className="text-gray-500 mb-4">Please select or create a team to manage tasks.</p>
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading tasks...</p>
       </div>
     )
   }
@@ -117,63 +193,81 @@ export default function TasksPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Tasks</h1>
-        <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Add Task
-            </Button>
-          </DialogTrigger>
+        <Dialog
+          open={isAddTaskOpen}
+          onOpenChange={(open) => {
+            setIsAddTaskOpen(open)
+            if (!open) setEditingTask(null)
+          }}
+        >
+          <Button onClick={() => setIsAddTaskOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Task
+          </Button>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingTask ? "Edit Task" : "Add New Task"}</DialogTitle>
             </DialogHeader>
+
+            <AlertDisplay message={error} />
+
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="task-title">Title</Label>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="task-title" className="text-right">
+                  Title
+                </Label>
                 <Input
                   id="task-title"
                   value={newTask}
                   onChange={(e) => setNewTask(e.target.value)}
-                  placeholder="Enter task title"
+                  className="col-span-3"
+                  disabled={isSubmitting}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="task-assignee">Assign To</Label>
-                <Select value={assignee} onValueChange={(value) => setAssignee(value)}>
-                  <SelectTrigger id="task-assignee">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {currentTeam?.members.map((member) => (
-                      <SelectItem key={member.userId} value={member.userId}>
-                        {member.user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
-            <Button onClick={editingTask ? handleUpdateTask : handleAddTask}>
-              {editingTask ? "Update Task" : "Add Task"}
+            <Button onClick={editingTask ? handleUpdateTask : handleAddTask} disabled={isSubmitting || !newTask.trim()}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {editingTask ? "Updating..." : "Adding..."}
+                </>
+              ) : editingTask ? (
+                "Update Task"
+              ) : (
+                "Add Task"
+              )}
             </Button>
           </DialogContent>
         </Dialog>
       </div>
 
-      <TeamContextDisplay />
+      <AlertDisplay message={error} />
 
       <Card className="p-6">
-        <ul className="space-y-4">
-          {teamTasks.map((task) => (
-            <li key={task.id} className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  checked={task.completed}
-                  onCheckedChange={() => handleToggleTask(task.id)}
-                  id={`task-${task.id}`}
-                />
-                <div>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between animate-pulse">
+                <div className="flex items-center space-x-2">
+                  <div className="h-4 w-4 rounded-sm bg-muted"></div>
+                  <div className="h-4 w-48 bg-muted rounded"></div>
+                </div>
+                <div className="flex space-x-2">
+                  <div className="h-8 w-8 bg-muted rounded"></div>
+                  <div className="h-8 w-8 bg-muted rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : tasks.length > 0 ? (
+          <ul className="space-y-4">
+            {tasks.map((task) => (
+              <li key={task.id} className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={task.completed}
+                    onCheckedChange={() => handleToggleTask(task.id, task.completed)}
+                    id={`task-${task.id}`}
+                  />
                   <label
                     htmlFor={`task-${task.id}`}
                     className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
@@ -182,20 +276,27 @@ export default function TasksPage() {
                   >
                     {task.title}
                   </label>
-                  <p className="text-xs text-gray-500 mt-1">Assigned to: {getAssigneeName(task.assignedTo)}</p>
                 </div>
-              </div>
-              <div className="space-x-2">
-                <Button variant="outline" size="icon" onClick={() => handleEditTask(task)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => handleDeleteTask(task.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                <div className="space-x-2">
+                  <Button variant="outline" size="icon" onClick={() => handleEditTask(task)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => handleDeleteTask(task.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-center py-10">
+            <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-gray-500 mb-4">No tasks yet. Add your first task to get started.</p>
+            <Button onClick={() => setIsAddTaskOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Your First Task
+            </Button>
+          </div>
+        )}
       </Card>
     </div>
   )

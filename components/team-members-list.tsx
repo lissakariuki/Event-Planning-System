@@ -4,8 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, Shield, ShieldCheck, User } from "lucide-react"
+import { MoreHorizontal } from "lucide-react"
 import type { Team } from "@/lib/types"
 
 interface TeamMembersListProps {
@@ -16,32 +15,9 @@ export function TeamMembersList({ team }: TeamMembersListProps) {
   if (team.members.length === 0) {
     return (
       <div className="text-center py-10">
-        <p className="text-muted-foreground">No team members yet. Add your first team member to get started.</p>
+        <p className="text-gray-500">No team members yet. Add your first team member to get started.</p>
       </div>
     )
-  }
-
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "owner":
-        return (
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            <ShieldCheck className="h-3 w-3 mr-1 fill-primary" /> Owner
-          </Badge>
-        )
-      case "admin":
-        return (
-          <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
-            <Shield className="h-3 w-3 mr-1" /> Admin
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="outline" className="bg-secondary text-secondary-foreground">
-            <User className="h-3 w-3 mr-1" /> Member
-          </Badge>
-        )
-    }
   }
 
   return (
@@ -67,7 +43,7 @@ export function TeamMembersList({ team }: TeamMembersListProps) {
               </div>
             </TableCell>
             <TableCell>{member.user.email}</TableCell>
-            <TableCell>{getRoleBadge(member.role)}</TableCell>
+            <TableCell className="capitalize">{member.role}</TableCell>
             <TableCell>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -78,7 +54,7 @@ export function TeamMembersList({ team }: TeamMembersListProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem>Change Role</DropdownMenuItem>
-                  {member.role !== "owner" && <DropdownMenuItem className="text-destructive">Remove</DropdownMenuItem>}
+                  {member.role !== "owner" && <DropdownMenuItem className="text-red-500">Remove</DropdownMenuItem>}
                 </DropdownMenuContent>
               </DropdownMenu>
             </TableCell>
@@ -88,4 +64,3 @@ export function TeamMembersList({ team }: TeamMembersListProps) {
     </Table>
   )
 }
-

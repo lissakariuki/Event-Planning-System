@@ -15,7 +15,7 @@ import { Progress } from "@/components/ui/progress"
 import { ImageUrlInput } from "@/components/image-url-input"
 import { EmptyTeamState } from "@/components/empty-team-state"
 import { TeamMembersList } from "@/components/team-members-list"
-import { TeamDiscussions } from "@/components/team-discussion"
+import { TeamDiscussions } from "@/components/team-discussions"
 import {
   Users,
   Calendar,

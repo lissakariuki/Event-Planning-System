@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useUser, useClerk, UserButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import { MoonIcon, SunIcon } from "lucide-react"
-import { TeamSelector } from "@/components/team-selector"
 
 export function Navbar() {
   const { isSignedIn, user } = useUser()
@@ -32,10 +31,9 @@ export function Navbar() {
     <div className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-white/80 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center">
-          <Link href="/" className="text-2xl font-bold text-blue-600 dark:text-blue-400 mr-4">
+          <Link href="/" className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             EPS
           </Link>
-          {isSignedIn && <TeamSelector />}
         </div>
 
         <div className="flex items-center space-x-4">
@@ -56,4 +54,3 @@ export function Navbar() {
     </div>
   )
 }
-

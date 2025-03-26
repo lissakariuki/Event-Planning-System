@@ -26,4 +26,3 @@ export function EmptyTeamState({ onCreateTeam }: EmptyTeamStateProps) {
     </Card>
   )
 }
-
