@@ -19,67 +19,31 @@ export function TeamCreationForm({ isOpen, onClose }: TeamCreationFormProps) {
   const router = useRouter()
   const { createTeam } = useTeam()
 
-  // Update the formData state to include numeric values for budget
+  // Update the formData state to exclude budget
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     logo: "",
     coverImage: "",
-    budget: {
-      current: 0,
-      total: 0,
-    },
   })
 
-  // Update the handleCreateTeam function to properly parse budget values
-  const handleCreateTeam = () => {
+  // Update the handleCreateTeam function to exclude budget logic
+  const handleCreateTeam = async () => {
     if (formData.name.trim()) {
-      // Parse budget values as numbers
-      const currentBudget = Number.parseInt(formData.budget.current.toString(), 10) || 0
-      const totalBudget = Number.parseInt(formData.budget.total.toString(), 10) || 0
-
-      // Create the team with all the necessary data including budget values
-      const createdTeam = createTeam(formData.name.trim(), formData.description.trim() || undefined, {
-        current: currentBudget,
-        total: totalBudget,
+      // Create the team with the necessary data
+      const createdTeam = await createTeam(formData.name.trim(), formData.description.trim() || undefined, {
         logo: formData.logo || `/placeholder.svg?height=100&width=100&text=${formData.name.trim().charAt(0)}`,
-        coverImage: formData.coverImage || "https://images.pexels.com/photos/31049332/pexels-photo-31049332/free-photo-of-minimalist-palm-tree-with-afternoon-shadows.jpeg?auto=compress&cs=tinysrgb&w=600&lazy=load",
+        coverImage: formData.coverImage || "/placeholder.svg?height=300&width=1200",
       })
 
-      // Reset form and close dialog
       // Reset form data
       setFormData({
         name: "",
         description: "",
         logo: "",
         coverImage: "",
-        budget: {
-          current: 0,
-          total: 0,
-        },
       })
 
-      // Update database in real-time
-      try {
-         fetch(`/api/teams/${createdTeam.id}`, {
-          method: 'PUT',
-          headers: {
-        'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        logo: formData.logo,
-        coverImage: formData.coverImage,
-        budget: {
-          current: currentBudget,
-          total: totalBudget,
-        },
-          }),
-        });
-      } catch (error) {
-        console.error('Error updating team:', error);
-      }
       onClose()
 
       // Navigate to the new team page
@@ -139,53 +103,6 @@ export function TeamCreationForm({ isOpen, onClose }: TeamCreationFormProps) {
                 previewWidth={160}
                 previewClassName="rounded-md"
               />
-            </div>
-          </div>
-
-          {/* Update the budget input fields to handle numeric values */}
-          <div className="grid gap-3">
-            <Label>Budget</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="current-budget" className="text-sm text-gray-500">
-                  Current Budget ($)
-                </Label>
-                <Input
-                  id="current-budget"
-                  type="number"
-                  value={formData.budget.current}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      budget: {
-                        ...formData.budget,
-                        current: Number.parseInt(e.target.value, 10) || 0,
-                      },
-                    })
-                  }
-                  placeholder="0"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="total-budget" className="text-sm text-gray-500">
-                  Total Budget ($)
-                </Label>
-                <Input
-                  id="total-budget"
-                  type="number"
-                  value={formData.budget.total}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      budget: {
-                        ...formData.budget,
-                        total: Number.parseInt(e.target.value, 10) || 0,
-                      },
-                    })
-                  }
-                  placeholder="0"
-                />
-              </div>
             </div>
           </div>
         </div>

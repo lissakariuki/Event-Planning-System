@@ -1,104 +1,103 @@
 "use client"
 
-import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect } from "react"
+import { useTeam } from "@/contexts/team-context"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { PlusCircle } from "lucide-react"
+import { VendorList } from "@/components/vendor-list"
+import { VendorForm } from "@/components/vendor-form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { VendorCard } from "@/components/vendor-card"
-import { Search } from "lucide-react"
-
-// Mock data for vendors with Kenyan Shilling prices
-const vendors = [
-  {
-    id: 1,
-    name: "Elegant Events Venue",
-    type: "Venue",
-    rating: 4.8,
-    price: 500000,
-    capacity: 200,
-    location: "Nairobi, Kenya",
-  },
-  {
-    id: 2,
-    name: "Gourmet Delights Catering",
-    type: "Catering",
-    rating: 4.5,
-    price: 250000,
-    capacity: null,
-    location: "Mombasa, Kenya",
-  },
-  {
-    id: 3,
-    name: "Floral Fantasy",
-    type: "Decor",
-    rating: 4.7,
-    price: 100000,
-    capacity: null,
-    location: "Kisumu, Kenya",
-  },
-  {
-    id: 4,
-    name: "Sound Masters",
-    type: "Entertainment",
-    rating: 4.6,
-    price: 150000,
-    capacity: null,
-    location: "Nakuru, Kenya",
-  },
-  {
-    id: 5,
-    name: "Luxe Ballroom",
-    type: "Venue",
-    rating: 4.9,
-    price: 750000,
-    capacity: 300,
-    location: "Nairobi, Kenya",
-  },
-]
 
 export default function VendorsPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedType, setSelectedType] = useState("")
+  const { teams, currentTeam, setCurrentTeam } = useTeam()
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [showVendorForm, setShowVendorForm] = useState(false)
 
-  const filteredVendors = vendors.filter(
-    (vendor) =>
-      vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (selectedType === "all" || vendor.type === selectedType),
-  )
+  // Set initial team only once when teams are loaded
+  useEffect(() => {
+    if (teams.length > 0 && !selectedTeamId) {
+      const initialTeamId = teams[0].id
+      setSelectedTeamId(initialTeamId)
+
+      // Only set current team if it's different from the current one
+      if (!currentTeam || currentTeam.id !== initialTeamId) {
+        const team = teams.find((t) => t.id === initialTeamId)
+        if (team) {
+          setCurrentTeam(team)
+        }
+      }
+    }
+  }, [teams, selectedTeamId, currentTeam, setCurrentTeam])
+
+  const handleTeamChange = (teamId: string) => {
+    setSelectedTeamId(teamId)
+    const team = teams.find((t) => t.id === teamId)
+    if (team) {
+      setCurrentTeam(team)
+    }
+  }
+
+  const handleCreateVendor = () => {
+    setShowVendorForm(true)
+  }
+
+  const handleVendorCreated = () => {
+    setShowVendorForm(false)
+  }
+
+  const handleCancelCreate = () => {
+    setShowVendorForm(false)
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Vendors</h1>
-      <Card className="p-4 md:p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Input
-              placeholder="Search vendors..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-          </div>
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Venue">Venue</SelectItem>
-              <SelectItem value="Catering">Catering</SelectItem>
-              <SelectItem value="Decor">Decor</SelectItem>
-              <SelectItem value="Entertainment">Entertainment</SelectItem>
-            </SelectContent>
-          </Select>
+    <div className="space-y-6 pb-20 relative mt-16">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h1 className="text-3xl font-bold">Vendors</h1>
+        <div className="hidden sm:block">
+          {selectedTeamId && !showVendorForm && (
+            <Button onClick={handleCreateVendor}
+              size="default"
+              className="transition-all duration-300 shadow-md hover:shadow-lg"
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Vendor
+            </Button>
+          )}
         </div>
-      </Card>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVendors.map((vendor) => (
-          <VendorCard key={vendor.id} vendor={vendor} />
-        ))}
       </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="w-full md:w-64">
+            <label className="text-sm font-medium mb-1 block">Select Team</label>
+            <Select value={selectedTeamId || ""} onValueChange={handleTeamChange} disabled={teams.length === 0}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a team" />
+              </SelectTrigger>
+              <SelectContent>
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {showVendorForm && selectedTeamId && (
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-xl font-semibold mb-4">Add New Vendor</h2>
+            <VendorForm teamId={selectedTeamId} onVendorCreated={handleVendorCreated} onCancel={handleCancelCreate} />
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedTeamId && <VendorList teamId={selectedTeamId} />}
     </div>
   )
 }
+

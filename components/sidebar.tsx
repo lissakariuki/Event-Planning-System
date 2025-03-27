@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useParams } from "next/navigation"
-import { Home, DollarSign, Users, Calendar, MessageCircle, CheckSquare, Music, PlusCircle } from "lucide-react"
+import { Home, DollarSign, Users, Calendar, MessageCircle, CheckSquare, Music, PlusCircle, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useTeam } from "@/contexts/team-context"
@@ -125,6 +125,16 @@ export function Sidebar() {
         >
           <CheckSquare className="mr-2" size={20} />
           Tasks
+        </Link>
+        <Link
+          href="/documents"
+          className={cn(
+            "flex items-center px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800",
+            pathname === "/documents" && "bg-gray-200 dark:bg-gray-800",
+          )}
+        >
+          <FileText className="mr-2" size={20} />
+          Documents
         </Link>
       </nav>
 
