@@ -1,50 +1,45 @@
--- Create teams table
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  owner_id TEXT NOT NULL,
-  budget_current DECIMAL DEFAULT 0,
-  budget_total DECIMAL DEFAULT 0,
-  upcoming_events INTEGER DEFAULT 0,
-  active_members INTEGER DEFAULT 0
-);
+-- Function to create a mock users table if it doesn't exist
+CREATE OR REPLACE FUNCTION create_mock_users_table()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Check if the users table exists
+  IF NOT EXISTS (
+    SELECT FROM pg_tables 
+    WHERE schemaname = 'public' 
+    AND tablename = 'users'
+  ) THEN
+    -- Create a temporary users table for testing
+    CREATE TABLE public.users (
+      id UUID PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+    
+    -- Add a comment to indicate this is a temporary table
+    COMMENT ON TABLE public.users IS 'Temporary users table created for testing purposes';
+  END IF;
+END;
+$$;
 
--- Create team_members table
-CREATE TABLE team_members (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(team_id, user_id)
-);
+-- Function to count tasks by completion status
+CREATE OR REPLACE FUNCTION count_tasks_by_completion(team_id_param UUID)
+RETURNS TABLE (
+  status TEXT,
+  count BIGINT
+)
+LANGUAGE sql
+AS $$
+  SELECT 
+    CASE WHEN completed THEN 'completed' ELSE 'incomplete' END as status,
+    COUNT(*) as count
+  FROM 
+    tasks
+  WHERE 
+    team_id = team_id_param
+  GROUP BY 
+    completed;
+$$;
 
--- Create events table
-CREATE TABLE events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  description TEXT,
-  date TIMESTAMP WITH TIME ZONE NOT NULL,
-  time TEXT,
-  location TEXT,
-  image_url TEXT,
-  price DECIMAL DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by TEXT NOT NULL
-);
-
--- Create tasks table
-CREATE TABLE tasks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  completed BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by TEXT NOT NULL
-);
-
--- Enable realtime for all tables
-ALTER PUBLICATION supabase_realtime ADD TABLE teams, team_members, events, tasks;
