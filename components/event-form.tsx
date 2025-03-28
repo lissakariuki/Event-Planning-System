@@ -95,16 +95,17 @@ export function EventForm({ teamId, eventId, initialData, onEventCreated, onCanc
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="title" className="block text-sm font-medium mb-1">
+        <label htmlFor="event-title" className="block text-sm font-medium mb-1">
           Event Title *
         </label>
         <Input
-          id="title"
+          id="event-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Enter event title"
           disabled={isSubmitting}
           required
+          data-cy="event-title-input"
         />
       </div>
 
@@ -124,16 +125,17 @@ export function EventForm({ teamId, eventId, initialData, onEventCreated, onCanc
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="date" className="block text-sm font-medium mb-1">
+          <label htmlFor="event-date" className="block text-sm font-medium mb-1">
             Date *
           </label>
           <Input
-            id="date"
+            id="event-date"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             disabled={isSubmitting}
             required
+            data-cy="event-date-input"
           />
         </div>
         <div>
@@ -179,7 +181,7 @@ export function EventForm({ teamId, eventId, initialData, onEventCreated, onCanc
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting} data-cy="save-event">
           {isSubmitting ? (eventId ? "Updating..." : "Creating...") : eventId ? "Update Event" : "Create Event"}
         </Button>
       </div>

@@ -42,7 +42,7 @@ export function Navbar() {
           </Button>
 
           {isSignedIn ? (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4" data-cy="dashboard-header">
               <span className="text-sm font-medium">Welcome back, {user.fullName || user.username}</span>
               <UserButton afterSignOutUrl="/" />
             </div>
