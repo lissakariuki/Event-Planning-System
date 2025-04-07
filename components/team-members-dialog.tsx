@@ -9,10 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useSupabase } from "@/hooks/use-supabase"
-import { useTeam, type TeamMember } from "@/contexts/team-context"
-import { Loader2, UserPlus, Trash2, UserCog } from "lucide-react"
+import { useTeam } from "@/contexts/team-context"
+import { Loader2, UserPlus, Trash2, UserCog, CheckCircle, AlertCircle } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { sendInvitationEmail } from "@/lib/email-service"
 
 interface TeamMembersDialogProps {
   teamId: string
@@ -21,12 +23,14 @@ interface TeamMembersDialogProps {
 }
 
 export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialogProps) {
-  const [members, setMembers] = useState<TeamMember[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberRole, setNewMemberRole] = useState<string>("member")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
+  const [statusMessage, setStatusMessage] = useState("")
   const { user } = useUser()
   const { supabase } = useSupabase()
   const { currentTeam, addTeamMember, removeTeamMember, updateTeamMember } = useTeam()
@@ -51,10 +55,10 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
 
         // Transform to TeamMember objects
         // In a real app, you would fetch user details from your user service
-        const transformedMembers: TeamMember[] = (data || []).map((member) => ({
+        const transformedMembers = (data || []).map((member) => ({
           id: `member-${member.user_id}`,
           userId: member.user_id,
-          role: member.role as "owner" | "admin" | "member",
+          role: member.role,
           name: member.user_id === user?.id ? user.fullName || "You" : `User ${member.user_id.substring(0, 8)}`,
           email:
             member.user_id === user?.id
@@ -83,16 +87,39 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
     }
 
     setIsSubmitting(true)
+    setEmailStatus("sending")
     setError(null)
 
     try {
+      // First, send the invitation email
+      const teamName = currentTeam?.name || "an event planning team"
+      const fromName = user?.fullName || user?.username || "A team member"
+      const fromEmail = user?.primaryEmailAddress?.emailAddress || "noreply@eps.com"
+      const roleName = newMemberRole.charAt(0).toUpperCase() + newMemberRole.slice(1)
+
+      const emailResult = await sendInvitationEmail({
+        to_email: newMemberEmail,
+        to_name: newMemberEmail,
+        from_name: fromName,
+        from_email: fromEmail,
+        subject: `Invitation to join ${teamName}`,
+        message: `You have been invited to join ${teamName} on the Event Planning System as a ${newMemberRole}.`,
+        team_name: teamName,
+        role: roleName,
+      })
+
+      if (!emailResult.success) {
+        throw new Error(emailResult.message)
+      }
+
+      // Then add the member to the database
       await addTeamMember(teamId, newMemberEmail, newMemberRole)
 
       // Add the new member to the local state
-      const newMember: TeamMember = {
+      const newMember = {
         id: `member-${Math.random().toString(36).substring(2, 11)}`,
         userId: `temp-${Math.random().toString(36).substring(2, 11)}`,
-        role: newMemberRole as "owner" | "admin" | "member",
+        role: newMemberRole,
         name: `Invited User`,
         email: newMemberEmail,
       }
@@ -100,9 +127,19 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
       setMembers([...members, newMember])
       setNewMemberEmail("")
       setNewMemberRole("member")
+      setEmailStatus("success")
+      setStatusMessage(`Invitation sent to ${newMemberEmail}`)
+
+      // Reset status after 3 seconds
+      setTimeout(() => {
+        setEmailStatus("idle")
+        setStatusMessage("")
+      }, 3000)
     } catch (err: any) {
       console.error("Error adding team member:", err)
       setError(`Failed to add team member: ${err.message}`)
+      setEmailStatus("error")
+      setStatusMessage("Failed to send invitation email")
     } finally {
       setIsSubmitting(false)
     }
@@ -135,11 +172,7 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
       await updateTeamMember(teamId, userId, newRole)
 
       // Update the member in the local state
-      setMembers(
-        members.map((member) =>
-          member.userId === userId ? { ...member, role: newRole as "owner" | "admin" | "member" } : member,
-        ),
-      )
+      setMembers(members.map((member) => (member.userId === userId ? { ...member, role: newRole } : member)))
     } catch (err: any) {
       console.error("Error updating team member role:", err)
       setError(`Failed to update team member role: ${err.message}`)
@@ -174,6 +207,20 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                 <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
               </div>
+            )}
+
+            {emailStatus === "success" && (
+              <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-600 dark:text-green-400">{statusMessage}</AlertDescription>
+              </Alert>
+            )}
+
+            {emailStatus === "error" && (
+              <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertDescription className="text-red-600 dark:text-red-400">{statusMessage}</AlertDescription>
+              </Alert>
             )}
 
             <div className="space-y-4">
@@ -277,12 +324,12 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
                     {isSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Adding...
+                        Sending Invitation...
                       </>
                     ) : (
                       <>
                         <UserPlus className="h-4 w-4 mr-2" />
-                        Add Member
+                        Send Invitation
                       </>
                     )}
                   </Button>

@@ -22,6 +22,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
+        <head></head>
         <body className={inter.className}>
           <TeamProvider>
             <div className="flex h-screen">
@@ -38,3 +39,4 @@ export default function RootLayout({
     </ClerkProvider>
   )
 }
+
