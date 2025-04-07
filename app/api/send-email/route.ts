@@ -1,46 +1,61 @@
 import { NextResponse } from "next/server"
-import emailjs from "@emailjs/browser"
+import emailjs from "@emailjs/nodejs"
 
-// EmailJS configuration
-const SERVICE_ID = "service_3qip0f4"
-const TEMPLATE_ID = "template_34mxs58"
-const PUBLIC_KEY = "TtuP_lCm09hExM7On"
-
-// Initialize EmailJS
-emailjs.init(PUBLIC_KEY)
+// Initialize EmailJS with your credentials
+emailjs.init({
+  publicKey: process.env.EMAILJS_PUBLIC_KEY,
+  privateKey: process.env.EMAILJS_PRIVATE_KEY,
+})
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { to_email, to_name, from_name, from_email, subject, message, team_name, event_title, role } = body
 
-    // Format current time
-    const now = new Date()
-    const formattedTime = now.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    })
-
-    // Prepare template parameters to match the template variables
+    // Prepare template parameters for EmailJS
     const templateParams = {
-      name: from_name,
-      time: formattedTime,
-      message: message,
-      to_email: to_email,
-      subject: subject || "New Invite from EPS",
+      to_email,
+      to_name: to_name || to_email,
+      from_name,
+      from_email,
+      subject: subject || `Invitation to join ${team_name || "Event Planning Team"}`,
+      message,
+      team_name: team_name || "Event Planning Team",
+      event_title: event_title || "",
+      role: role || "",
+      year: new Date().getFullYear(),
     }
 
-    console.log("Sending email with params:", templateParams)
+    // Check if we're in development mode
+    if (process.env.NODE_ENV === "development" && process.env.SKIP_EMAIL_SENDING === "true") {
+      // Log the email details but don't actually send
+      console.log("Development mode: Email would be sent with these details:", {
+        to: to_email,
+        subject: templateParams.subject,
+        from: `${from_name} <${from_email}>`,
+      })
 
-    // Send the email
-    const result = await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
+      return NextResponse.json({
+        success: true,
+        message: `Email would be sent to ${to_email} in production environment`,
+      })
+    }
 
-    console.log("Email sent successfully:", result.text)
-    return NextResponse.json({ success: true, message: "Invitation sent successfully" })
+    // Send the email using EmailJS
+    const response = await emailjs.send(
+      process.env.EMAILJS_SERVICE_ID!,
+      process.env.EMAILJS_TEMPLATE_ID!,
+      templateParams,
+    )
+
+    console.log("Email sent:", response.status, response.text)
+
+    return NextResponse.json({
+      success: true,
+      message: "Invitation sent successfully",
+      status: response.status,
+      text: response.text,
+    })
   } catch (error) {
     console.error("Error sending email:", error)
     return NextResponse.json(

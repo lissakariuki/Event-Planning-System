@@ -91,12 +91,15 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
     setError(null)
 
     try {
-      // First, send the invitation email
+      // Fetch the authenticated user's details from Clerk
       const teamName = currentTeam?.name || "an event planning team"
-      const fromName = user?.fullName || user?.username || "A team member"
-      const fromEmail = user?.primaryEmailAddress?.emailAddress || "noreply@eps.com"
-      const roleName = newMemberRole.charAt(0).toUpperCase() + newMemberRole.slice(1)
+      const fromName = user?.fullName || user?.username || "Unknown User"
+      const fromEmail = user?.primaryEmailAddress?.emailAddress || "no-reply@example.com"
 
+      console.log("From Name:", fromName)
+      console.log("From Email:", fromEmail)
+
+      // Send the invitation email
       const emailResult = await sendInvitationEmail({
         to_email: newMemberEmail,
         to_name: newMemberEmail,
@@ -105,36 +108,22 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
         subject: `Invitation to join ${teamName}`,
         message: `You have been invited to join ${teamName} on the Event Planning System as a ${newMemberRole}.`,
         team_name: teamName,
-        role: roleName,
+        role: newMemberRole.charAt(0).toUpperCase() + newMemberRole.slice(1),
       })
 
       if (!emailResult.success) {
         throw new Error(emailResult.message)
       }
 
-      // Then add the member to the database
+      // Add the member to the database
       await addTeamMember(teamId, newMemberEmail, newMemberRole)
 
-      // Add the new member to the local state
-      const newMember = {
-        id: `member-${Math.random().toString(36).substring(2, 11)}`,
-        userId: `temp-${Math.random().toString(36).substring(2, 11)}`,
-        role: newMemberRole,
-        name: `Invited User`,
-        email: newMemberEmail,
-      }
-
-      setMembers([...members, newMember])
+      // Update local state
+      setMembers([...members, { id: `temp-${Date.now()}`, email: newMemberEmail, role: newMemberRole }])
       setNewMemberEmail("")
       setNewMemberRole("member")
       setEmailStatus("success")
       setStatusMessage(`Invitation sent to ${newMemberEmail}`)
-
-      // Reset status after 3 seconds
-      setTimeout(() => {
-        setEmailStatus("idle")
-        setStatusMessage("")
-      }, 3000)
     } catch (err: any) {
       console.error("Error adding team member:", err)
       setError(`Failed to add team member: ${err.message}`)

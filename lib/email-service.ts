@@ -23,8 +23,28 @@ interface EmailParams {
 /**
  * Send an email invitation using EmailJS
  */
-export async function sendInvitationEmail(params: EmailParams): Promise<{ success: boolean; message: string }> {
+export async function sendInvitationEmail({
+  to_email,
+  from_name,
+  from_email,
+  subject,
+  message,
+  team_name,
+  role,
+}: {
+  to_email: string
+  to_name: string
+  from_name: string
+  from_email: string
+  subject: string
+  message: string
+  team_name: string
+  role: string
+}): Promise<{ success: boolean; message: string }> {
   try {
+    // Ensure the from_name and from_email are not overridden here
+    console.log("Sending Email From:", from_name, from_email)
+
     // Format current time
     const now = new Date()
     const formattedTime = now.toLocaleString("en-US", {
@@ -38,11 +58,15 @@ export async function sendInvitationEmail(params: EmailParams): Promise<{ succes
 
     // Prepare template parameters to match the template variables
     const templateParams = {
-      name: params.from_name,
+      name: from_name,
+      email: from_email,
       time: formattedTime,
-      message: params.message,
-      to_email: params.to_email,
-      subject: params.subject || "New Invite from EPS",
+      message: message,
+      to_email: to_email,
+      subject: subject || "New Invite from EPS",
+      team_name: team_name || "",
+      role: role || "",
+      invited_by: from_email
     }
 
     console.log("Sending email with params:", templateParams)
