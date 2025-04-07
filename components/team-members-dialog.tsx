@@ -91,24 +91,20 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
     setError(null)
 
     try {
-      // Fetch the authenticated user's details from Clerk
       const teamName = currentTeam?.name || "an event planning team"
       const fromName = user?.fullName || user?.username || "Unknown User"
       const fromEmail = user?.primaryEmailAddress?.emailAddress || "no-reply@example.com"
 
-      console.log("From Name:", fromName)
-      console.log("From Email:", fromEmail)
-
       // Send the invitation email
       const emailResult = await sendInvitationEmail({
         to_email: newMemberEmail,
-        to_name: newMemberEmail,
         from_name: fromName,
         from_email: fromEmail,
         subject: `Invitation to join ${teamName}`,
         message: `You have been invited to join ${teamName} on the Event Planning System as a ${newMemberRole}.`,
         team_name: teamName,
         role: newMemberRole.charAt(0).toUpperCase() + newMemberRole.slice(1),
+        team_id: teamId, // Pass the team ID here
       })
 
       if (!emailResult.success) {

@@ -18,6 +18,7 @@ interface EmailParams {
   team_name?: string
   event_title?: string
   role?: string
+  team_id?: string // Add team_id to the type definition
 }
 
 /**
@@ -31,15 +32,17 @@ export async function sendInvitationEmail({
   message,
   team_name,
   role,
+  team_id, // Add team_id to the parameters
 }: {
   to_email: string
-  to_name: string
+  to_name?: string
   from_name: string
   from_email: string
-  subject: string
+  subject?: string
   message: string
   team_name: string
   role: string
+  team_id: string // Add team_id to the type definition
 }): Promise<{ success: boolean; message: string }> {
   try {
     // Ensure the from_name and from_email are not overridden here
@@ -56,6 +59,9 @@ export async function sendInvitationEmail({
       hour12: true,
     })
 
+    // Generate the team-specific invitation link
+    const invitationLink = `https://events-project-six.vercel.app/teams/${team_id}`
+
     // Prepare template parameters to match the template variables
     const templateParams = {
       name: from_name,
@@ -66,7 +72,8 @@ export async function sendInvitationEmail({
       subject: subject || "New Invite from EPS",
       team_name: team_name || "",
       role: role || "",
-      invited_by: from_email
+      invited_by: from_email,
+      invitation_link: invitationLink, // Add the invitation link to the template parameters
     }
 
     console.log("Sending email with params:", templateParams)
