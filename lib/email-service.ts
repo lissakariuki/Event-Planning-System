@@ -60,7 +60,7 @@ export async function sendInvitationEmail({
     })
 
     // Generate the team-specific invitation link
-    const invitationLink = `https://events-project-six.vercel.app/teams/${team_id}`
+    const invitationLink = `https://events-project-six.vercel.app/${team_id}?email=${encodeURIComponent(to_email)}`
 
     // Prepare template parameters to match the template variables
     const templateParams = {

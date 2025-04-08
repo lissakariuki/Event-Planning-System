@@ -4,7 +4,54 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { useUser } from "@clerk/nextjs"
 import { useSupabase } from "@/hooks/use-supabase"
 import type { Team, TeamMember, TeamEvent, TeamTask, Guest, TeamVendor, TeamDocument } from "@/lib/types"
-import { useRealtimeSubscription } from "@/lib/real-time"
+
+// Types
+export interface Event {
+  id: string
+  title: string
+  description?: string
+  date: string
+  time?: string
+  location?: string
+  image_url?: string
+  price?: number
+  createdAt: Date
+  createdBy: string
+}
+
+export interface Task {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: Date
+  createdBy: string
+}
+
+export interface Vendor {
+  id: string
+  name: string
+  category: string
+  contact: string
+  email?: string
+  phone?: string
+  website?: string
+  notes?: string
+  price?: number
+  status: "pending" | "confirmed" | "cancelled"
+  createdAt: Date
+  createdBy: string
+}
+
+export interface Document {
+  id: string
+  name: string
+  filePath: string
+  fileType: string
+  fileSize: number
+  eventId?: string
+  uploadedBy: string
+  uploadedAt: Date
+}
 
 interface TeamContextType {
   teams: Team[]
@@ -18,6 +65,7 @@ interface TeamContextType {
   getUserRole: (userId: string, teamId: string) => "owner" | "admin" | "member" | null
   isLoading: boolean
   error: string | null
+  refreshTeams: () => Promise<void> // Added refreshTeams function
 
   // Methods for real-time updates
   updateTeamBudget: (teamId: string, current: number, total: number) => Promise<void>
@@ -226,7 +274,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
         // Set current team if none is selected - using functional update to avoid dependency
         if (validTeams.length > 0) {
-          setCurrentTeam(prev => prev || validTeams[0])
+          setCurrentTeam((prev) => prev || validTeams[0])
         }
       } catch (error) {
         console.error("Error loading teams:", error)
@@ -322,7 +370,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
                 }))
               : [],
           }
-        })
+        }),
       )
 
       if (!isMounted.current) return
@@ -330,9 +378,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setTeams(transformedTeams)
 
       // Update current team if it exists in the new data
-      setCurrentTeam(prev => {
+      setCurrentTeam((prev) => {
         if (!prev) return transformedTeams[0] || null
-        const updatedCurrentTeam = transformedTeams.find(t => t.id === prev.id)
+        const updatedCurrentTeam = transformedTeams.find((t) => t.id === prev.id)
         return updatedCurrentTeam || transformedTeams[0] || null
       })
     } catch (err: any) {
@@ -347,6 +395,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
   }, [user, supabase])
 
+  // Add refreshTeams function that uses fetchTeams
+  const refreshTeams = useCallback(async () => {
+    try {
+      await fetchTeams()
+      return Promise.resolve()
+    } catch (error) {
+      console.error("Error refreshing teams:", error)
+      return Promise.reject(error)
+    }
+  }, [fetchTeams])
+
   // Set up real-time subscriptions for the current team
   useEffect(() => {
     if (!currentTeam?.id) return
@@ -356,41 +415,53 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     // Set up subscriptions
     const eventsSubscription = supabase
       .channel(`events-${teamId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'events',
-        filter: `team_id=eq.${teamId}`
-      }, (payload) => {
-        if (!isMounted.current) return
-        fetchTeams()
-      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "events",
+          filter: `team_id=eq.${teamId}`,
+        },
+        (payload) => {
+          if (!isMounted.current) return
+          fetchTeams()
+        },
+      )
       .subscribe()
 
     const tasksSubscription = supabase
       .channel(`tasks-${teamId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'tasks',
-        filter: `team_id=eq.${teamId}`
-      }, (payload) => {
-        if (!isMounted.current) return
-        fetchTeams()
-      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tasks",
+          filter: `team_id=eq.${teamId}`,
+        },
+        (payload) => {
+          if (!isMounted.current) return
+          fetchTeams()
+        },
+      )
       .subscribe()
 
     const membersSubscription = supabase
       .channel(`team_members-${teamId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'team_members',
-        filter: `team_id=eq.${teamId}`
-      }, (payload) => {
-        if (!isMounted.current) return
-        fetchTeams()
-      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "team_members",
+          filter: `team_id=eq.${teamId}`,
+        },
+        (payload) => {
+          if (!isMounted.current) return
+          fetchTeams()
+        },
+      )
       .subscribe()
 
     // Clean up subscriptions
@@ -401,252 +472,276 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     }
   }, [currentTeam?.id, supabase, fetchTeams])
 
-  const createTeam = useCallback(async (name: string, description?: string): Promise<Team | null> => {
-    if (!user || !isMounted.current) return null
+  const createTeam = useCallback(
+    async (name: string, description?: string): Promise<Team | null> => {
+      if (!user || !isMounted.current) return null
 
-    setError(null)
-    setIsLoading(true)
+      setError(null)
+      setIsLoading(true)
 
-    try {
-      // Insert team with budget initialization
-      const { data: teamData, error: teamError } = await supabase
-        .from("teams")
-        .insert({
-          name,
-          description,
-          owner_id: user.id,
-          budget_current: 0, // Initialize current budget
-          budget_total: 0, // Initialize total budget
-          upcoming_events: 0,
-          active_members: 1,
+      try {
+        // Insert team with budget initialization
+        const { data: teamData, error: teamError } = await supabase
+          .from("teams")
+          .insert({
+            name,
+            description,
+            owner_id: user.id,
+            budget_current: 0, // Initialize current budget
+            budget_total: 0, // Initialize total budget
+            upcoming_events: 0,
+            active_members: 1,
+          })
+          .select()
+          .single()
+
+        if (teamError) {
+          console.error("Error creating team:", teamError)
+          if (isMounted.current) {
+            setError(`Failed to create team: ${teamError.message}`)
+          }
+          return null
+        }
+
+        if (!teamData) {
+          if (isMounted.current) {
+            setError("Failed to create team: No data returned")
+          }
+          return null
+        }
+
+        // Add current user as team owner
+        const { error: memberError } = await supabase.from("team_members").insert({
+          team_id: teamData.id,
+          user_id: user.id,
+          role: "owner",
         })
-        .select()
-        .single()
 
-      if (teamError) {
-        console.error("Error creating team:", teamError)
-        if (isMounted.current) {
-          setError(`Failed to create team: ${teamError.message}`)
-        }
-        return null
-      }
+        if (memberError) {
+          console.error("Error adding team member:", memberError)
+          if (isMounted.current) {
+            setError(`Failed to add you as team owner: ${memberError.message}`)
+          }
 
-      if (!teamData) {
-        if (isMounted.current) {
-          setError("Failed to create team: No data returned")
-        }
-        return null
-      }
-
-      // Add current user as team owner
-      const { error: memberError } = await supabase.from("team_members").insert({
-        team_id: teamData.id,
-        user_id: user.id,
-        role: "owner",
-      })
-
-      if (memberError) {
-        console.error("Error adding team member:", memberError)
-        if (isMounted.current) {
-          setError(`Failed to add you as team owner: ${memberError.message}`)
+          // Clean up the team if we couldn't add the member
+          await supabase.from("teams").delete().eq("id", teamData.id)
+          return null
         }
 
-        // Clean up the team if we couldn't add the member
-        await supabase.from("teams").delete().eq("id", teamData.id)
-        return null
-      }
-
-      // Create team object
-      const newTeam: Team = {
-        id: teamData.id,
-        name: teamData.name,
-        description: teamData.description || undefined,
-        createdAt: new Date(teamData.created_at),
-        ownerId: user.id,
-        members: [
-          {
-            userId: user.id,
-            role: "owner",
-            user: {
-              id: user.id,
-              name: user.fullName || user.username || "Current User",
-              email: user.emailAddresses[0]?.emailAddress || "",
+        // Create team object
+        const newTeam: Team = {
+          id: teamData.id,
+          name: teamData.name,
+          description: teamData.description || undefined,
+          createdAt: new Date(teamData.created_at),
+          ownerId: user.id,
+          members: [
+            {
+              userId: user.id,
+              role: "owner",
+              user: {
+                id: user.id,
+                name: user.fullName || user.username || "Current User",
+                email: user.emailAddresses[0]?.emailAddress || "",
+              },
             },
+          ],
+          budget: {
+            current: teamData.budget_current || 0, // Map from database
+            total: teamData.budget_total || 0, // Map from database
           },
-        ],
-        budget: {
-          current: teamData.budget_current || 0, // Map from database
-          total: teamData.budget_total || 0, // Map from database
-        },
-        stats: {
-          upcomingEvents: 0,
-          activeMembers: 1,
-        },
-        events: [],
+          stats: {
+            upcomingEvents: 0,
+            activeMembers: 1,
+          },
+          events: [],
+        }
+
+        if (isMounted.current) {
+          setTeams((prev) => [...prev, newTeam])
+          setCurrentTeam(newTeam)
+        }
+
+        return newTeam
+      } catch (error: any) {
+        console.error("Error creating team:", error)
+        if (isMounted.current) {
+          setError(`An unexpected error occurred: ${error.message}`)
+        }
+        return null
+      } finally {
+        if (isMounted.current) {
+          setIsLoading(false)
+        }
       }
+    },
+    [user, supabase],
+  )
 
-      if (isMounted.current) {
-        setTeams(prev => [...prev, newTeam])
-        setCurrentTeam(newTeam)
-      }
+  const updateTeam = useCallback(
+    async (id: string, data: Partial<Team>) => {
+      if (!isMounted.current) return
 
-      return newTeam
-    } catch (error: any) {
-      console.error("Error creating team:", error)
-      if (isMounted.current) {
-        setError(`An unexpected error occurred: ${error.message}`)
-      }
-      return null
-    } finally {
-      if (isMounted.current) {
-        setIsLoading(false)
-      }
-    }
-  }, [user, supabase])
+      setError(null)
+      setIsLoading(true)
 
-  const updateTeam = useCallback(async (id: string, data: Partial<Team>) => {
-    if (!isMounted.current) return
+      try {
+        // Prepare data for Supabase
+        const updateData: any = {}
 
-    setError(null)
-    setIsLoading(true)
+        if (data.name) updateData.name = data.name
+        if (data.description !== undefined) updateData.description = data.description
+        if (data.budget) {
+          if (data.budget.current !== undefined) updateData.budget_current = data.budget.current
+          if (data.budget.total !== undefined) updateData.budget_total = data.budget.total
+        }
+        if (data.stats) {
+          if (data.stats.upcomingEvents !== undefined) updateData.upcoming_events = data.stats.upcomingEvents
+          if (data.stats.activeMembers !== undefined) updateData.active_members = data.stats.activeMembers
+        }
 
-    try {
-      // Prepare data for Supabase
-      const updateData: any = {}
+        // Update in Supabase
+        const { error } = await supabase.from("teams").update(updateData).eq("id", id)
 
-      if (data.name) updateData.name = data.name
-      if (data.description !== undefined) updateData.description = data.description
-      if (data.budget) {
-        if (data.budget.current !== undefined) updateData.budget_current = data.budget.current
-        if (data.budget.total !== undefined) updateData.budget_total = data.budget.total
-      }
-      if (data.stats) {
-        if (data.stats.upcomingEvents !== undefined) updateData.upcoming_events = data.stats.upcomingEvents
-        if (data.stats.activeMembers !== undefined) updateData.active_members = data.stats.activeMembers
-      }
+        if (error) {
+          console.error("Error updating team:", error)
+          if (isMounted.current) {
+            setError(`Failed to update team: ${error.message}`)
+          }
+          return
+        }
 
-      // Update in Supabase
-      const { error } = await supabase.from("teams").update(updateData).eq("id", id)
-
-      if (error) {
+        // Update local state using functional updates
+        if (isMounted.current) {
+          setTeams((prev) => prev.map((team) => (team.id === id ? { ...team, ...data } : team)))
+          setCurrentTeam((prev) => (prev?.id === id ? { ...prev, ...data } : prev))
+        }
+      } catch (error: any) {
         console.error("Error updating team:", error)
         if (isMounted.current) {
-          setError(`Failed to update team: ${error.message}`)
+          setError(`An unexpected error occurred: ${error.message}`)
         }
-        return
+      } finally {
+        if (isMounted.current) {
+          setIsLoading(false)
+        }
       }
+    },
+    [supabase],
+  )
 
-      // Update local state using functional updates
-      if (isMounted.current) {
-        setTeams(prev => prev.map(team => team.id === id ? { ...team, ...data } : team))
-        setCurrentTeam(prev => prev?.id === id ? { ...prev, ...data } : prev)
+  const updateTeamBudget = useCallback(
+    async (teamId: string, current: number, total: number) => {
+      if (!isMounted.current) return
+
+      try {
+        const { error } = await supabase
+          .from("teams")
+          .update({
+            budget_current: current,
+            budget_total: total,
+          })
+          .eq("id", teamId)
+
+        if (error) throw error
+
+        // Update local state using functional updates
+        if (isMounted.current) {
+          setTeams((prev) =>
+            prev.map((team) =>
+              team.id === teamId
+                ? {
+                    ...team,
+                    budget: { current, total },
+                  }
+                : team,
+            ),
+          )
+
+          setCurrentTeam((prev) =>
+            prev?.id === teamId
+              ? {
+                  ...prev,
+                  budget: { current, total },
+                }
+              : prev,
+          )
+        }
+      } catch (error: any) {
+        console.error("Error updating team budget:", error)
+        if (isMounted.current) {
+          setError(`Failed to update budget: ${error.message}`)
+        }
       }
-    } catch (error: any) {
-      console.error("Error updating team:", error)
-      if (isMounted.current) {
-        setError(`An unexpected error occurred: ${error.message}`)
-      }
-    } finally {
-      if (isMounted.current) {
-        setIsLoading(false)
-      }
-    }
-  }, [supabase])
+    },
+    [supabase],
+  )
 
-  const updateTeamBudget = useCallback(async (teamId: string, current: number, total: number) => {
-    if (!isMounted.current) return
+  const deleteTeam = useCallback(
+    async (id: string) => {
+      if (!isMounted.current) return
 
-    try {
-      const { error } = await supabase
-        .from("teams")
-        .update({ 
-          budget_current: current,
-          budget_total: total 
-        })
-        .eq("id", teamId)
+      setError(null)
+      setIsLoading(true)
 
-      if (error) throw error
+      try {
+        // Delete from Supabase
+        const { error } = await supabase.from("teams").delete().eq("id", id)
 
-      // Update local state using functional updates
-      if (isMounted.current) {
-        setTeams(prev => prev.map(team => 
-          team.id === teamId ? {
-            ...team,
-            budget: { current, total }
-          } : team
-        ))
-        
-        setCurrentTeam(prev => 
-          prev?.id === teamId ? {
-            ...prev,
-            budget: { current, total }
-          } : prev
-        )
-      }
-    } catch (error: any) {
-      console.error("Error updating team budget:", error)
-      if (isMounted.current) {
-        setError(`Failed to update budget: ${error.message}`)
-      }
-    }
-  }, [supabase])
+        if (error) {
+          console.error("Error deleting team:", error)
+          if (isMounted.current) {
+            setError(`Failed to delete team: ${error.message}`)
+          }
+          return
+        }
 
-  const deleteTeam = useCallback(async (id: string) => {
-    if (!isMounted.current) return
-
-    setError(null)
-    setIsLoading(true)
-
-    try {
-      // Delete from Supabase
-      const { error } = await supabase.from("teams").delete().eq("id", id)
-
-      if (error) {
+        // Update local state using functional updates
+        if (isMounted.current) {
+          setTeams((prev) => prev.filter((team) => team.id !== id))
+          setCurrentTeam((prev) => {
+            if (prev?.id === id) {
+              const nextTeam = teams.find((team) => team.id !== id)
+              return nextTeam || null
+            }
+            return prev
+          })
+        }
+      } catch (error: any) {
         console.error("Error deleting team:", error)
         if (isMounted.current) {
-          setError(`Failed to delete team: ${error.message}`)
+          setError(`An unexpected error occurred: ${error.message}`)
         }
-        return
+      } finally {
+        if (isMounted.current) {
+          setIsLoading(false)
+        }
       }
-
-      // Update local state using functional updates
-      if (isMounted.current) {
-        setTeams(prev => prev.filter(team => team.id !== id))
-        setCurrentTeam(prev => {
-          if (prev?.id === id) {
-            const nextTeam = teams.find(team => team.id !== id)
-            return nextTeam || null
-          }
-          return prev
-        })
-      }
-    } catch (error: any) {
-      console.error("Error deleting team:", error)
-      if (isMounted.current) {
-        setError(`An unexpected error occurred: ${error.message}`)
-      }
-    } finally {
-      if (isMounted.current) {
-        setIsLoading(false)
-      }
-    }
-  }, [supabase, teams])
+    },
+    [supabase, teams],
+  )
 
   const inviteToTeam = async (teamId: string, email: string) => {
     // In a real app, this would send an invitation email
     console.log(`Inviting ${email} to team ${teamId}`)
   }
 
-  const isTeamMember = useCallback((userId: string, teamId: string): boolean => {
-    const team = teams.find((t) => t.id === teamId)
-    return !!team?.members.find((member) => member.userId === userId)
-  }, [teams])
+  const isTeamMember = useCallback(
+    (userId: string, teamId: string): boolean => {
+      const team = teams.find((t) => t.id === teamId)
+      return !!team?.members.find((member) => member.userId === userId)
+    },
+    [teams],
+  )
 
-  const getUserRole = useCallback((userId: string, teamId: string): "owner" | "admin" | "member" | null => {
-    const team = teams.find((t) => t.id === teamId)
-    const member = team?.members.find((m) => m.userId === userId)
-    return member?.role || null
-  }, [teams])
+  const getUserRole = useCallback(
+    (userId: string, teamId: string): "owner" | "admin" | "member" | null => {
+      const team = teams.find((t) => t.id === teamId)
+      const member = team?.members.find((m) => m.userId === userId)
+      return member?.role || null
+    },
+    [teams],
+  )
 
   // Memoize the setCurrentTeam function to avoid unnecessary re-renders
   const handleSetCurrentTeam = useCallback((team: Team | null) => {
@@ -672,16 +767,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const addTeamDocument = useCallback(async () => Promise.resolve(null), [])
   const deleteTeamDocument = useCallback(async () => Promise.resolve(), [])
 
-  const getDashboardStats = useCallback(() => ({
-    totalBudget: 0,
-    currentBudget: 0,
-    totalGuests: 0,
-    confirmedGuests: 0,
-    totalTasks: 0,
-    completedTasks: 0,
-    upcomingEvents: [],
-    recentActivities: [],
-  }), [])
+  const getDashboardStats = useCallback(
+    () => ({
+      totalBudget: 0,
+      currentBudget: 0,
+      totalGuests: 0,
+      confirmedGuests: 0,
+      totalTasks: 0,
+      completedTasks: 0,
+      upcomingEvents: [],
+      recentActivities: [],
+    }),
+    [],
+  )
 
   // Memoize the context value to prevent unnecessary re-renders
   const contextValue = {
@@ -696,6 +794,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     getUserRole,
     isLoading,
     error,
+    refreshTeams, // Added refreshTeams to the context value
     updateTeamBudget,
     addTeamMember,
     removeTeamMember,
@@ -717,11 +816,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     getDashboardStats,
   }
 
-  return (
-    <TeamContext.Provider value={contextValue}>
-      {children}
-    </TeamContext.Provider>
-  )
+  return <TeamContext.Provider value={contextValue}>{children}</TeamContext.Provider>
 }
 
 export function useTeam() {

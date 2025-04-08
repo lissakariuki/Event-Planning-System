@@ -5,16 +5,15 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useUser } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { useSupabase } from "@/hooks/use-supabase"
-import { useTeam } from "@/contexts/team-context"
-import { Loader2, UserPlus, Trash2, UserCog, CheckCircle, AlertCircle } from "lucide-react"
+import { useTeam, type TeamMember } from "@/contexts/team-context"
+import { Loader2, Trash2, UserCog } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { sendInvitationEmail } from "@/lib/email-service"
+// Import the TeamInviteForm component
+import { TeamInviteForm } from "./team-invite-form"
 
 interface TeamMembersDialogProps {
   teamId: string
@@ -23,17 +22,17 @@ interface TeamMembersDialogProps {
 }
 
 export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialogProps) {
-  const [members, setMembers] = useState<any[]>([])
+  const [members, setMembers] = useState<TeamMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberRole, setNewMemberRole] = useState<string>("member")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
-  const [statusMessage, setStatusMessage] = useState("")
   const { user } = useUser()
   const { supabase } = useSupabase()
   const { currentTeam, addTeamMember, removeTeamMember, updateTeamMember } = useTeam()
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   // Load team members
   useEffect(() => {
@@ -55,10 +54,10 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
 
         // Transform to TeamMember objects
         // In a real app, you would fetch user details from your user service
-        const transformedMembers = (data || []).map((member) => ({
+        const transformedMembers: TeamMember[] = (data || []).map((member) => ({
           id: `member-${member.user_id}`,
           userId: member.user_id,
-          role: member.role,
+          role: member.role as "owner" | "admin" | "member",
           name: member.user_id === user?.id ? user.fullName || "You" : `User ${member.user_id.substring(0, 8)}`,
           email:
             member.user_id === user?.id
@@ -78,6 +77,32 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
     loadMembers()
   }, [teamId, isOpen, supabase, user])
 
+  // Function to send invitation email
+  async function sendInvitationEmail(data: any) {
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error("Email sending failed:", errorData)
+        return { success: false, message: errorData.error || "Failed to send email" }
+      }
+
+      const result = await response.json()
+      return { success: true, message: result.message }
+    } catch (error: any) {
+      console.error("Error sending email:", error)
+      return { success: false, message: error.message || "Failed to send email" }
+    }
+  }
+
+  // Update the handleAddMember function to properly handle team invitations
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -95,6 +120,25 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
       const fromName = user?.fullName || user?.username || "Unknown User"
       const fromEmail = user?.primaryEmailAddress?.emailAddress || "no-reply@example.com"
 
+      // Generate a unique token for this invitation
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+
+      // Create invitation link with email and token
+      const invitationLink = `${window.location.origin}/teams/${teamId}?email=${encodeURIComponent(newMemberEmail)}&token=${token}`
+
+      // Store the invitation in the database
+      const { error: inviteError } = await supabase.from("team_invitations").insert({
+        team_id: teamId,
+        email: newMemberEmail.trim(),
+        role: newMemberRole,
+        token,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+      })
+
+      if (inviteError) {
+        throw inviteError
+      }
+
       // Send the invitation email
       const emailResult = await sendInvitationEmail({
         to_email: newMemberEmail,
@@ -104,15 +148,16 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
         message: `You have been invited to join ${teamName} on the Event Planning System as a ${newMemberRole}.`,
         team_name: teamName,
         role: newMemberRole.charAt(0).toUpperCase() + newMemberRole.slice(1),
-        team_id: teamId, // Pass the team ID here
+        team_id: teamId,
+        invitation_link: invitationLink, // Add the invitation link
       })
 
       if (!emailResult.success) {
         throw new Error(emailResult.message)
       }
 
-      // Add the member to the database
-      await addTeamMember(teamId, newMemberEmail, newMemberRole)
+      // Add the member to the database (this will be handled when they accept the invitation)
+      // await addTeamMember(teamId, newMemberEmail, newMemberRole)
 
       // Update local state
       setMembers([...members, { id: `temp-${Date.now()}`, email: newMemberEmail, role: newMemberRole }])
@@ -157,7 +202,11 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
       await updateTeamMember(teamId, userId, newRole)
 
       // Update the member in the local state
-      setMembers(members.map((member) => (member.userId === userId ? { ...member, role: newRole } : member)))
+      setMembers(
+        members.map((member) =>
+          member.userId === userId ? { ...member, role: newRole as "owner" | "admin" | "member" } : member,
+        ),
+      )
     } catch (err: any) {
       console.error("Error updating team member role:", err)
       setError(`Failed to update team member role: ${err.message}`)
@@ -194,18 +243,16 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
               </div>
             )}
 
-            {emailStatus === "success" && (
-              <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertDescription className="text-green-600 dark:text-green-400">{statusMessage}</AlertDescription>
-              </Alert>
-            )}
-
-            {emailStatus === "error" && (
-              <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertDescription className="text-red-600 dark:text-red-400">{statusMessage}</AlertDescription>
-              </Alert>
+            {statusMessage && (
+              <div
+                className={`p-3 ${
+                  emailStatus === "success"
+                    ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400"
+                    : "bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400"
+                } rounded-md`}
+              >
+                <p className="text-sm">{statusMessage}</p>
+              </div>
             )}
 
             <div className="space-y-4">
@@ -269,57 +316,8 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Add New Member</h3>
-
-              <form onSubmit={handleAddMember} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <label htmlFor="email" className="block text-sm font-medium mb-1">
-                      Email Address
-                    </label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={newMemberEmail}
-                      onChange={(e) => setNewMemberEmail(e.target.value)}
-                      placeholder="Enter email address"
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="role" className="block text-sm font-medium mb-1">
-                      Role
-                    </label>
-                    <Select value={newMemberRole} onValueChange={setNewMemberRole} disabled={isSubmitting}>
-                      <SelectTrigger id="role">
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="member">Member</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Sending Invitation...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Send Invitation
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </form>
+              <h3 className="text-lg font-medium">Invite New Member</h3>
+              <TeamInviteForm teamId={teamId} teamName={currentTeam?.name || "Team"} />
             </div>
           </div>
         )}
@@ -333,4 +331,3 @@ export function TeamMembersDialog({ teamId, isOpen, onClose }: TeamMembersDialog
     </Dialog>
   )
 }
-
