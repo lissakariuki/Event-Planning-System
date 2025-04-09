@@ -18,7 +18,7 @@ interface EmailParams {
   team_name?: string
   event_title?: string
   role?: string
-  team_id?: string // Add team_id to the type definition
+  team_id?: string
 }
 
 /**
@@ -32,7 +32,7 @@ export async function sendInvitationEmail({
   message,
   team_name,
   role,
-  team_id, // Add team_id to the parameters
+  team_id,
 }: {
   to_email: string
   to_name?: string
@@ -42,7 +42,7 @@ export async function sendInvitationEmail({
   message: string
   team_name: string
   role: string
-  team_id: string // Add team_id to the type definition
+  team_id: string
 }): Promise<{ success: boolean; message: string }> {
   try {
     // Ensure the from_name and from_email are not overridden here
@@ -59,8 +59,8 @@ export async function sendInvitationEmail({
       hour12: true,
     })
 
-    // Generate the team-specific invitation link
-    const invitationLink = `https://events-project-six.vercel.app/${team_id}?email=${encodeURIComponent(to_email)}`
+    // Generate the team-specific invitation link using the dedicated invitation route
+    const invitationLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invitations/${team_id}?email=${encodeURIComponent(to_email)}`
 
     // Prepare template parameters to match the template variables
     const templateParams = {
@@ -73,7 +73,7 @@ export async function sendInvitationEmail({
       team_name: team_name || "",
       role: role || "",
       invited_by: from_email,
-      invitation_link: invitationLink, // Add the invitation link to the template parameters
+      invitation_link: invitationLink,
     }
 
     console.log("Sending email with params:", templateParams)
@@ -88,4 +88,3 @@ export async function sendInvitationEmail({
     return { success: false, message: error instanceof Error ? error.message : "Failed to send invitation" }
   }
 }
-

@@ -1,17 +1,21 @@
+import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createClient } from "@/utils/supabase/middleware"
 
-export async function middleware(request: NextRequest) {
+// This function can be marked `async` if using `await` inside
+export function middleware(request: NextRequest) {
   const { supabase, response } = createClient(request)
 
-  // Optional: Check authentication status
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Allow access to invitation routes
+  const url = new URL(request.url)
+  if (url.pathname.startsWith("/invitations/")) {
+    return NextResponse.next()
+  }
 
   return response
 }
 
+// See "Matching Paths" below to learn more
 export const config = {
   matcher: [
     /*
@@ -20,8 +24,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - invitations routes (handled separately)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public|invitations).*)",
   ],
 }
-
